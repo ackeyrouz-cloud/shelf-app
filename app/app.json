@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Shelf",
+    "slug": "shelf-meal-planner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#E7DEC6"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yourname.shelf",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Shelf uses your camera to identify ingredients on your shelf so you don't have to type them."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#E7DEC6"
+      },
+      "package": "com.yourname.shelf",
+      "permissions": ["CAMERA"]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "YOUR-EAS-PROJECT-ID"
+      }
+    }
+  }
+}
