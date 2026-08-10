@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#E7DEC6"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.yourname.shelf",
@@ -25,12 +27,18 @@
         "backgroundColor": "#E7DEC6"
       },
       "package": "com.yourname.shelf",
-      "permissions": ["CAMERA"]
+      "permissions": [
+        "CAMERA"
+      ]
     },
     "extra": {
       "eas": {
         "projectId": "YOUR-EAS-PROJECT-ID"
       }
-    }
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font"
+    ]
   }
 }
