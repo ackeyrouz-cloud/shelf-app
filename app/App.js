@@ -11,7 +11,7 @@ import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from '@expo-google-
 
 // Point this at your deployed backend (see server/README.md).
 // Never call the Anthropic API directly from the app — the key must stay server-side.
-const API_BASE_URL = 'https://YOUR-BACKEND-URL.example.com';
+const API_BASE_URL = 'https://shelf-backend-97bp.onrender.com';
 
 const STORAGE_KEY = 'shelf-pantry-items';
 const DIETS = [
