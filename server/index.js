@@ -101,7 +101,7 @@ Respond ONLY with a JSON array, no other text, in this exact shape:
 ]
 If a recipe needs nothing extra, "missing" should be an empty array.`;
 
-    const data = await callClaude([{ role: 'user', content: prompt }]);
+    const data = await callClaude([{ role: 'user', content: prompt }], 4096);
     const textBlock = (data.content || []).find((b) => b.type === 'text');
     if (!textBlock) throw new Error('No text response from model');
     const recipes = extractJson(textBlock.text);
