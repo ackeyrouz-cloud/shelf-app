@@ -13,13 +13,32 @@ import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from '@expo-google-
 // Never call the Anthropic API directly from the app — the key must stay server-side.
 const API_BASE_URL = 'https://shelf-backend-97bp.onrender.com';
 
+const COLORS = {
+  kraft: '#E7DEC6',
+  cream: '#F6F1E3',
+  ink: '#262922',
+  inkMuted: '#5F6256',
+  red: '#C1442A',
+  forest: '#2F4A3C',
+  gold: '#D8A23A',
+  white: '#FFFFFF',
+  hairline: 'rgba(38,41,34,0.18)',
+};
+
 const STORAGE_KEY = 'shelf-pantry-items';
 const DIETS = [
   { v: 'none', label: 'No restriction' },
   { v: 'vegetarian', label: 'Vegetarian' },
   { v: 'vegan', label: 'Vegan' },
+  { v: 'pescatarian', label: 'Pescatarian' },
   { v: 'gluten-free', label: 'Gluten-free' },
   { v: 'dairy-free', label: 'Dairy-free' },
+  { v: 'nut-free', label: 'Nut-free' },
+  { v: 'keto', label: 'Keto' },
+  { v: 'low-carb', label: 'Low-carb' },
+  { v: 'paleo', label: 'Paleo' },
+  { v: 'high-protein', label: 'High-protein' },
+  { v: 'halal', label: 'Halal' },
 ];
 const TIMES = [
   { v: 'any', label: 'Any' },
@@ -40,7 +59,7 @@ export default function App() {
 
   const [pantry, setPantry] = useState([]);
   const [inputText, setInputText] = useState('');
-  const [diet, setDiet] = useState('none');
+  const [diets, setDiets] = useState(['none']);
   const [time, setTime] = useState('any');
   const [mood, setMood] = useState('');
   const [loading, setLoading] = useState(false);
@@ -79,6 +98,15 @@ export default function App() {
     savePantry(next);
   };
 
+  const toggleDiet = (v) => {
+    setDiets(prev => {
+      if (v === 'none') return ['none'];
+      const withoutNone = prev.filter(d => d !== 'none');
+      const next = withoutNone.includes(v) ? withoutNone.filter(d => d !== v) : [...withoutNone, v];
+      return next.length ? next : ['none'];
+    });
+  };
+
   const pickPhoto = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
@@ -101,7 +129,9 @@ export default function App() {
         body: JSON.stringify({ base64: asset.base64, mediaType: 'image/jpeg' }),
       });
       const data = await res.json();
-      if (Array.isArray(data.items) && data.items.length) {
+      if (data.notFood) {
+        setError("That doesn't look like food — try another photo.");
+      } else if (Array.isArray(data.items) && data.items.length) {
         const next = [...pantry];
         data.items.forEach(it => {
           if (!next.some(x => x.toLowerCase() === String(it).toLowerCase())) next.push(it);
@@ -128,11 +158,14 @@ export default function App() {
       const res = await fetch(`${API_BASE_URL}/find-recipes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pantry, diet, time, mood }),
+        body: JSON.stringify({ pantry, diets, time, mood }),
       });
       const data = await res.json();
       if (Array.isArray(data.recipes)) {
         setRecipes(data.recipes);
+        if (data.recipes.length === 0) {
+          setError('No recipes matched every filter you chose — try loosening one and search again.');
+        }
       } else {
         setError('Something went wrong generating recipes. Try again.');
       }
@@ -145,7 +178,7 @@ export default function App() {
   if (!fontsLoaded) {
     return (
       <SafeAreaView style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator color="#C1442A" />
+        <ActivityIndicator color={COLORS.red} />
       </SafeAreaView>
     );
   }
@@ -167,7 +200,7 @@ export default function App() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g. chicken thighs, rice, half an onion"
-                placeholderTextColor="rgba(38,41,34,0.4)"
+                placeholderTextColor={COLORS.inkMuted}
                 value={inputText}
                 onChangeText={setInputText}
                 onSubmitEditing={addFromText}
@@ -180,15 +213,19 @@ export default function App() {
 
             <TouchableOpacity style={styles.photoBtn} onPress={pickPhoto} disabled={photoLoading}>
               {photoLoading
-                ? <ActivityIndicator color="#262922" />
-                : <Text style={styles.photoBtnText}>📷  Or snap a photo of your shelf</Text>}
+                ? <ActivityIndicator color={COLORS.ink} />
+                : <Text style={styles.photoBtnText}>Or snap a photo of your shelf</Text>}
             </TouchableOpacity>
 
             <View style={styles.tags}>
               {pantry.map((item, i) => (
                 <View key={item + i} style={styles.tag}>
                   <Text style={styles.tagText}>{item}</Text>
-                  <TouchableOpacity onPress={() => removeItem(i)}>
+                  <TouchableOpacity
+                    onPress={() => removeItem(i)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    style={styles.tagRemoveHit}
+                  >
                     <Text style={styles.tagRemove}>✕</Text>
                   </TouchableOpacity>
                 </View>
@@ -200,7 +237,7 @@ export default function App() {
           <SectionLabel text="Filters" />
           <View style={styles.card}>
             <FilterBlock title="Diet">
-              <ChipRow options={DIETS} value={diet} onChange={setDiet} />
+              <MultiChipRow options={DIETS} values={diets} onToggle={toggleDiet} />
             </FilterBlock>
             <FilterBlock title="Time" style={{ marginTop: 16 }}>
               <ChipRow options={TIMES} value={time} onChange={setTime} />
@@ -209,7 +246,7 @@ export default function App() {
               <TextInput
                 style={styles.input}
                 placeholder="e.g. cozy, spicy, Italian, quick weeknight"
-                placeholderTextColor="rgba(38,41,34,0.4)"
+                placeholderTextColor={COLORS.inkMuted}
                 value={mood}
                 onChangeText={setMood}
               />
@@ -220,7 +257,7 @@ export default function App() {
             <Text style={styles.ctaText}>{loading ? 'Looking…' : 'Find recipes'}</Text>
           </TouchableOpacity>
 
-          {loading && <ActivityIndicator style={{ marginTop: 14 }} color="#C1442A" />}
+          {loading && <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.red} />}
           {!!error && (
             <View style={styles.errorBox}><Text style={styles.errorText}>{error}</Text></View>
           )}
@@ -264,21 +301,47 @@ function FilterBlock({ title, children, style }) {
 function ChipRow({ options, value, onChange }) {
   return (
     <View style={styles.chipRow}>
-      {options.map(opt => (
-        <TouchableOpacity
-          key={opt.v}
-          style={[styles.chip, value === opt.v && styles.chipActive]}
-          onPress={() => onChange(opt.v)}
-        >
-          <Text style={[styles.chipText, value === opt.v && styles.chipTextActive]}>{opt.label}</Text>
-        </TouchableOpacity>
-      ))}
+      {options.map(opt => {
+        const active = value === opt.v;
+        return (
+          <TouchableOpacity
+            key={opt.v}
+            style={[styles.chip, active && styles.chipActive]}
+            onPress={() => onChange(opt.v)}
+          >
+            <View style={[styles.chipCheck, active && styles.chipCheckActive]} />
+            <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function MultiChipRow({ options, values, onToggle }) {
+  return (
+    <View style={styles.chipRow}>
+      {options.map(opt => {
+        const active = values.includes(opt.v);
+        return (
+          <TouchableOpacity
+            key={opt.v}
+            style={[styles.chip, active && styles.chipActive]}
+            onPress={() => onToggle(opt.v)}
+          >
+            <View style={[styles.chipCheck, active && styles.chipCheckActive]} />
+            <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
 
 function RecipeCard({ recipe, open, onToggle }) {
   const missing = recipe.missing || [];
+  const usesFromShelf = recipe.usesFromShelf || [];
+  const totalRelevant = usesFromShelf.length + missing.length;
   const ready = missing.length === 0;
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onToggle} style={[styles.recipe, !ready && styles.recipeNeedsBuy]}>
@@ -294,8 +357,12 @@ function RecipeCard({ recipe, open, onToggle }) {
         </View>
       </View>
 
+      {totalRelevant > 0 && (
+        <Text style={styles.usesLine}>Uses {usesFromShelf.length} of {totalRelevant} ingredients you have</Text>
+      )}
+
       {!ready && (
-        <Text style={styles.missingLine}>Pick up: <Text style={{ fontWeight: '700', color: '#C1442A' }}>{missing.join(', ')}</Text></Text>
+        <Text style={styles.missingLine}>Pick up: <Text style={{ fontWeight: '700', color: COLORS.red }}>{missing.join(', ')}</Text></Text>
       )}
 
       <Text style={styles.expandHint}>{open ? 'Tap to collapse ▴' : 'Tap for full recipe ▾'}</Text>
@@ -317,73 +384,85 @@ function RecipeCard({ recipe, open, onToggle }) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#E7DEC6' },
+  safe: { flex: 1, backgroundColor: COLORS.kraft },
   wrap: { paddingHorizontal: 18, paddingBottom: 60 },
-  header: { paddingTop: 24, paddingBottom: 10 },
+  header: { paddingTop: 24, paddingBottom: 12 },
   stamp: {
     alignSelf: 'flex-start',
-    borderWidth: 2, borderColor: '#C1442A', borderRadius: 2,
+    borderWidth: 2, borderColor: COLORS.red, borderRadius: 2,
     paddingHorizontal: 10, paddingVertical: 3, transform: [{ rotate: '-2deg' }],
   },
-  stampText: { fontFamily: 'JetBrainsMono_500Medium', fontSize: 11, letterSpacing: 2, color: '#C1442A' },
-  h1: { fontFamily: 'SpecialElite_400Regular', fontSize: 42, color: '#262922', marginTop: 12 },
-  tagline: { fontFamily: 'WorkSans_400Regular', fontSize: 15, color: 'rgba(38,41,34,0.65)', marginTop: 6, lineHeight: 21 },
+  stampText: { fontFamily: 'JetBrainsMono_500Medium', fontSize: 11, letterSpacing: 2, color: COLORS.red },
+  h1: { fontFamily: 'SpecialElite_400Regular', fontSize: 42, color: COLORS.ink, marginTop: 12 },
+  tagline: { fontFamily: 'WorkSans_400Regular', fontSize: 15, color: COLORS.inkMuted, marginTop: 6, lineHeight: 21 },
 
-  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', marginTop: 30, marginBottom: 10, gap: 10 },
-  sectionLabelText: { fontFamily: 'JetBrainsMono_500Medium', fontSize: 11, letterSpacing: 2, color: '#2F4A3C', textTransform: 'uppercase' },
-  sectionLabelLine: { flex: 1, height: 1, backgroundColor: 'rgba(38,41,34,0.18)' },
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', marginTop: 28, marginBottom: 12, gap: 10 },
+  sectionLabelText: { fontFamily: 'JetBrainsMono_500Medium', fontSize: 11, letterSpacing: 2, color: COLORS.forest, textTransform: 'uppercase' },
+  sectionLabelLine: { flex: 1, height: 1, backgroundColor: COLORS.hairline },
 
-  card: { backgroundColor: '#F6F1E3', borderWidth: 1, borderColor: 'rgba(38,41,34,0.18)', borderRadius: 3, padding: 16 },
+  card: { backgroundColor: COLORS.cream, borderWidth: 1, borderColor: COLORS.hairline, borderRadius: 3, padding: 16 },
   addRow: { flexDirection: 'row', gap: 8 },
   input: {
     flex: 1, fontFamily: 'WorkSans_400Regular', fontSize: 15, paddingVertical: 12, paddingHorizontal: 14,
-    borderWidth: 1.5, borderColor: 'rgba(38,41,34,0.18)', borderRadius: 3, backgroundColor: '#fff', color: '#262922',
+    minHeight: 44,
+    borderWidth: 1.5, borderColor: COLORS.hairline, borderRadius: 3, backgroundColor: COLORS.white, color: COLORS.ink,
   },
-  addBtn: { backgroundColor: '#2F4A3C', paddingHorizontal: 18, justifyContent: 'center', borderRadius: 3 },
-  addBtnText: { fontFamily: 'WorkSans_600SemiBold', fontSize: 15, color: '#F6F1E3' },
+  addBtn: { backgroundColor: COLORS.forest, paddingHorizontal: 18, minHeight: 44, justifyContent: 'center', borderRadius: 3 },
+  addBtnText: { fontFamily: 'WorkSans_600SemiBold', fontSize: 15, color: COLORS.cream },
 
   photoBtn: {
-    marginTop: 10, borderWidth: 1.5, borderColor: 'rgba(38,41,34,0.25)', borderStyle: 'dashed',
-    borderRadius: 3, paddingVertical: 12, alignItems: 'center',
+    marginTop: 12, borderWidth: 1.5, borderColor: 'rgba(38,41,34,0.25)', borderStyle: 'dashed',
+    borderRadius: 3, paddingVertical: 13, minHeight: 44, alignItems: 'center', justifyContent: 'center',
   },
-  photoBtnText: { fontFamily: 'WorkSans_400Regular', fontSize: 13, color: '#262922' },
+  photoBtnText: {
+    fontFamily: 'JetBrainsMono_400Regular', fontSize: 11.5, letterSpacing: 1,
+    textTransform: 'uppercase', color: COLORS.ink,
+  },
 
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 },
   tag: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff',
-    borderWidth: 1, borderColor: 'rgba(38,41,34,0.18)', borderRadius: 2, paddingVertical: 6, paddingHorizontal: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: COLORS.white,
+    borderWidth: 1, borderColor: COLORS.hairline, borderRadius: 2, paddingVertical: 6, paddingHorizontal: 10,
   },
-  tagText: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 13, color: '#262922' },
-  tagRemove: { color: '#C1442A', fontWeight: '700' },
-  emptyNote: { fontFamily: 'WorkSans_400Regular', fontStyle: 'italic', fontSize: 13, color: 'rgba(38,41,34,0.45)', marginTop: 14 },
+  tagText: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 13, color: COLORS.ink },
+  tagRemoveHit: { minWidth: 20, minHeight: 20, alignItems: 'center', justifyContent: 'center' },
+  tagRemove: { color: COLORS.red, fontWeight: '700' },
+  emptyNote: { fontFamily: 'WorkSans_400Regular', fontStyle: 'italic', fontSize: 13, color: COLORS.inkMuted, marginTop: 14 },
 
-  filterTitle: { fontFamily: 'WorkSans_600SemiBold', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#2F4A3C', marginBottom: 8 },
+  filterTitle: { fontFamily: 'WorkSans_600SemiBold', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: COLORS.forest, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderWidth: 1.5, borderColor: 'rgba(38,41,34,0.18)', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 13, backgroundColor: '#fff' },
-  chipActive: { backgroundColor: '#D8A23A', borderColor: '#D8A23A' },
-  chipText: { fontFamily: 'WorkSans_400Regular', fontSize: 13, color: '#262922' },
-  chipTextActive: { fontFamily: 'WorkSans_600SemiBold' },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 44,
+    borderWidth: 1.5, borderColor: COLORS.hairline, borderRadius: 2,
+    paddingVertical: 11, paddingHorizontal: 12, backgroundColor: COLORS.cream,
+  },
+  chipActive: { backgroundColor: COLORS.ink, borderColor: COLORS.ink },
+  chipCheck: { width: 10, height: 10, borderWidth: 1.5, borderColor: COLORS.ink, borderRadius: 1 },
+  chipCheckActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
+  chipText: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 12, letterSpacing: 0.5, textTransform: 'uppercase', color: COLORS.ink },
+  chipTextActive: { fontFamily: 'JetBrainsMono_500Medium', color: COLORS.cream },
 
-  cta: { marginTop: 26, backgroundColor: '#C1442A', borderRadius: 3, paddingVertical: 16, alignItems: 'center' },
-  ctaText: { fontFamily: 'SpecialElite_400Regular', fontSize: 17, letterSpacing: 1, color: '#F6F1E3', textTransform: 'uppercase' },
+  cta: { marginTop: 24, backgroundColor: COLORS.red, borderRadius: 3, paddingVertical: 16, alignItems: 'center' },
+  ctaText: { fontFamily: 'SpecialElite_400Regular', fontSize: 17, letterSpacing: 1, color: COLORS.cream, textTransform: 'uppercase' },
 
-  errorBox: { marginTop: 14, backgroundColor: '#fbe9e5', borderWidth: 1, borderColor: '#C1442A', borderRadius: 3, padding: 12 },
+  errorBox: { marginTop: 16, backgroundColor: '#fbe9e5', borderWidth: 1, borderColor: COLORS.red, borderRadius: 3, padding: 12 },
   errorText: { fontFamily: 'WorkSans_400Regular', fontSize: 13, color: '#7a2a17' },
 
-  recipe: { backgroundColor: '#F6F1E3', borderWidth: 1, borderColor: 'rgba(38,41,34,0.18)', borderLeftWidth: 4, borderLeftColor: '#2F4A3C', borderRadius: 2, padding: 16, marginBottom: 12 },
-  recipeNeedsBuy: { borderLeftColor: '#D8A23A' },
-  recipeTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  recipeTitle: { fontFamily: 'SpecialElite_400Regular', fontSize: 19, color: '#262922' },
-  recipeMeta: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 11, color: 'rgba(38,41,34,0.6)', marginTop: 4, textTransform: 'uppercase' },
-  matchBadge: { backgroundColor: '#2F4A3C', borderRadius: 12, paddingVertical: 5, paddingHorizontal: 9 },
-  matchBadgePartial: { backgroundColor: '#D8A23A' },
-  matchBadgeText: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 11, color: '#F6F1E3' },
-  matchBadgeTextPartial: { color: '#262922' },
+  recipe: { backgroundColor: COLORS.cream, borderWidth: 1, borderColor: COLORS.hairline, borderLeftWidth: 4, borderLeftColor: COLORS.forest, borderRadius: 3, padding: 16, marginBottom: 12 },
+  recipeNeedsBuy: { borderLeftColor: COLORS.gold },
+  recipeTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  recipeTitle: { fontFamily: 'SpecialElite_400Regular', fontSize: 19, color: COLORS.ink },
+  recipeMeta: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 11, color: COLORS.inkMuted, marginTop: 4, textTransform: 'uppercase' },
+  matchBadge: { backgroundColor: COLORS.forest, borderRadius: 2, paddingVertical: 5, paddingHorizontal: 9 },
+  matchBadgePartial: { backgroundColor: COLORS.gold },
+  matchBadgeText: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 11, letterSpacing: 0.3, color: COLORS.cream },
+  matchBadgeTextPartial: { color: COLORS.ink },
+  usesLine: { fontFamily: 'WorkSans_400Regular', fontSize: 13, color: COLORS.inkMuted, marginTop: 10 },
   missingLine: { fontFamily: 'WorkSans_400Regular', fontSize: 13, color: 'rgba(38,41,34,0.75)', marginTop: 10 },
-  expandHint: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 12, color: 'rgba(38,41,34,0.4)', marginTop: 8 },
-  recipeDetail: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: 'rgba(38,41,34,0.18)', borderStyle: 'dashed' },
-  detailHeading: { fontFamily: 'WorkSans_700Bold', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#2F4A3C', marginBottom: 6 },
-  detailLine: { fontFamily: 'WorkSans_400Regular', fontSize: 14, color: '#262922', lineHeight: 21 },
+  expandHint: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 12, color: COLORS.inkMuted, marginTop: 8 },
+  recipeDetail: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: COLORS.hairline, borderStyle: 'dashed' },
+  detailHeading: { fontFamily: 'WorkSans_700Bold', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: COLORS.forest, marginBottom: 8 },
+  detailLine: { fontFamily: 'WorkSans_400Regular', fontSize: 14, color: COLORS.ink, lineHeight: 21 },
 
-  footer: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 11, color: 'rgba(38,41,34,0.4)', textAlign: 'center', marginTop: 36, letterSpacing: 0.5 },
+  footer: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 11, color: COLORS.inkMuted, textAlign: 'center', marginTop: 32, letterSpacing: 0.5 },
 });
