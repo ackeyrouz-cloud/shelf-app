@@ -40,6 +40,16 @@ const DIETS = [
   { v: 'high-protein', label: 'High-protein' },
   { v: 'halal', label: 'Halal' },
 ];
+// Diets that are logically incompatible — e.g. pescatarian (eats fish) directly
+// contradicts vegan/vegetarian (no fish). Not an exhaustive nutrition-logic matrix —
+// just the unambiguous cases where two selections can't both be true at once.
+const DIET_CONFLICTS = {
+  vegan: ['pescatarian'],
+  vegetarian: ['pescatarian'],
+  pescatarian: ['vegan', 'vegetarian'],
+};
+const dietLabel = (v) => (DIETS.find(d => d.v === v) || {}).label || v;
+
 const TIMES = [
   { v: 'any', label: 'Any' },
   { v: '15', label: 'Under 15 min' },
@@ -107,30 +117,46 @@ export default function App() {
   };
 
   const toggleDiet = (v) => {
-    setDiets(prev => {
-      if (v === 'none') return ['none'];
-      const withoutNone = prev.filter(d => d !== 'none');
-      const next = withoutNone.includes(v) ? withoutNone.filter(d => d !== v) : [...withoutNone, v];
-      return next.length ? next : ['none'];
-    });
+    if (v === 'none') {
+      setDiets(['none']);
+      setError('');
+      return;
+    }
+    const withoutNone = diets.filter(d => d !== 'none');
+    if (withoutNone.includes(v)) {
+      const next = withoutNone.filter(d => d !== v);
+      setDiets(next.length ? next : ['none']);
+      setError('');
+      return;
+    }
+    const conflicts = DIET_CONFLICTS[v] || [];
+    const conflicting = withoutNone.filter(d => conflicts.includes(d));
+    if (conflicting.length) {
+      setDiets([...withoutNone.filter(d => !conflicting.includes(d)), v]);
+      setError(`${dietLabel(v)} can't be combined with ${conflicting.map(dietLabel).join(' or ')} — swapped it in.`);
+      return;
+    }
+    setDiets([...withoutNone, v]);
+    setError('');
   };
 
   const pickPhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Camera access needed', 'Enable camera access in Settings to scan your shelf.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      base64: true,
-      quality: 0.6,
-      allowsEditing: false,
-    });
-    if (result.canceled) return;
-    const asset = result.assets[0];
-    setPhotoLoading(true);
     setError('');
     try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Camera access needed', 'Enable camera access in Settings to scan your shelf.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        base64: true,
+        quality: 0.6,
+        allowsEditing: false,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+
+      setPhotoLoading(true);
       const res = await fetch(`${API_BASE_URL}/identify-ingredients`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -150,8 +176,9 @@ export default function App() {
       }
     } catch (e) {
       setError('Photo reading failed. Check your connection and try again.');
+    } finally {
+      setPhotoLoading(false);
     }
-    setPhotoLoading(false);
   };
 
   const findRecipes = async () => {
@@ -214,6 +241,7 @@ export default function App() {
                 onChangeText={setInputText}
                 onSubmitEditing={addFromText}
                 returnKeyType="done"
+                maxLength={120}
               />
               <TouchableOpacity style={styles.addBtn} onPress={addFromText}>
                 <Text style={styles.addBtnText}>Add</Text>

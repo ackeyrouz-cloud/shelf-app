@@ -129,7 +129,13 @@ If the photo doesn't show food or pantry items at all, respond with:
     ], 500);
 
     const textBlock = (data.content || []).find((b) => b.type === 'text');
-    const parsed = textBlock ? extractJson(textBlock.text) : { items: [], notFood: false };
+    let parsed;
+    try {
+      parsed = textBlock ? extractJson(textBlock.text) : { items: [], notFood: false };
+    } catch (parseErr) {
+      console.warn('/identify-ingredients: model response was not valid JSON, returning no items. Raw response:', String(textBlock && textBlock.text).slice(0, 500));
+      parsed = { items: [], notFood: false };
+    }
     const items = Array.isArray(parsed.items) ? parsed.items : (Array.isArray(parsed) ? parsed : []);
     res.json({ items, notFood: !!parsed.notFood });
   } catch (err) {
@@ -187,7 +193,20 @@ If a recipe needs nothing extra, "missing" should be an empty array.`;
     const data = await callClaude([{ role: 'user', content: prompt }], 4096);
     const textBlock = (data.content || []).find((b) => b.type === 'text');
     if (!textBlock) throw new Error('No text response from model');
-    const recipes = extractJson(textBlock.text);
+
+    let recipes;
+    try {
+      recipes = extractJson(textBlock.text);
+    } catch (parseErr) {
+      recipes = null;
+    }
+    if (!Array.isArray(recipes)) {
+      // Most often caused by a heavily diet-incompatible pantry pushing the model to add
+      // explanatory text instead of pure JSON — treat it the same as "no compliant recipes"
+      // rather than surfacing an opaque 500.
+      console.warn('/find-recipes: model response was not a valid recipe array, returning no recipes. Raw response:', String(textBlock.text).slice(0, 500));
+      return res.json({ recipes: [] });
+    }
 
     const activeDiets = dietList.filter((d) => DIET_BLOCKLISTS[d]);
     let safeRecipes = recipes;
