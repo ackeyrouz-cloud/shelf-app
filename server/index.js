@@ -14,6 +14,10 @@ app.use(express.json({ limit: '10mb' }));
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-5';
+// Node/undici's default fetch timeout is 5 minutes with no feedback to the user in that
+// window — cap it far below that so a stalled request fails fast with a clear message
+// instead of leaving the app looking hung.
+const ANTHROPIC_TIMEOUT_MS = 25000;
 
 if (!ANTHROPIC_API_KEY) {
   console.warn('WARNING: ANTHROPIC_API_KEY is not set. Requests will fail.');
@@ -28,6 +32,7 @@ async function callClaude(messages, maxTokens = 1000) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, messages }),
+    signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -140,6 +145,9 @@ If the photo doesn't show food or pantry items at all, respond with:
     res.json({ items, notFood: !!parsed.notFood });
   } catch (err) {
     console.error(err);
+    if (err.name === 'TimeoutError') {
+      return res.status(504).json({ error: 'Request timed out', timeout: true });
+    }
     res.status(500).json({ error: 'Failed to identify ingredients' });
   }
 });
@@ -233,6 +241,9 @@ If a recipe needs nothing extra, "missing" should be an empty array.`;
     res.json({ recipes: timedRecipes });
   } catch (err) {
     console.error(err);
+    if (err.name === 'TimeoutError') {
+      return res.status(504).json({ error: 'Request timed out', timeout: true });
+    }
     res.status(500).json({ error: 'Failed to generate recipes' });
   }
 });

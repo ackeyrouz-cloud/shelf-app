@@ -12,6 +12,10 @@ import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from '@expo-google-
 // Point this at your deployed backend (see server/README.md).
 // Never call the Anthropic API directly from the app — the key must stay server-side.
 const API_BASE_URL = 'https://shelf-backend-97bp.onrender.com';
+// Longer than the server's own 25s Anthropic timeout, so a graceful timeout response
+// from the server has time to arrive before the client gives up on its own.
+const REQUEST_TIMEOUT_MS = 35000;
+const TIMEOUT_MESSAGE = 'This is taking longer than expected — please try again.';
 
 const COLORS = {
   kraft: '#E7DEC6',
@@ -143,6 +147,7 @@ export default function App() {
 
   const pickPhoto = async () => {
     setError('');
+    let timeoutId;
     try {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) {
@@ -158,13 +163,18 @@ export default function App() {
       const asset = result.assets[0];
 
       setPhotoLoading(true);
+      const controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       const res = await fetch(`${API_BASE_URL}/identify-ingredients`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ base64: asset.base64, mediaType: 'image/jpeg' }),
+        signal: controller.signal,
       });
       const data = await res.json();
-      if (data.notFood) {
+      if (data.timeout) {
+        setError(TIMEOUT_MESSAGE);
+      } else if (data.notFood) {
         setError("That doesn't look like food — try another photo.");
       } else if (Array.isArray(data.items) && data.items.length) {
         const next = [...pantry];
@@ -176,8 +186,9 @@ export default function App() {
         setError("Couldn't identify anything in that photo — try typing instead.");
       }
     } catch (e) {
-      setError('Photo reading failed. Check your connection and try again.');
+      setError(e.name === 'AbortError' ? TIMEOUT_MESSAGE : 'Photo reading failed. Check your connection and try again.');
     } finally {
+      clearTimeout(timeoutId);
       setPhotoLoading(false);
     }
   };
@@ -190,14 +201,19 @@ export default function App() {
     setError('');
     setRecipes([]);
     setLoading(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       const res = await fetch(`${API_BASE_URL}/find-recipes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pantry, diets, time, mood, servings }),
+        signal: controller.signal,
       });
       const data = await res.json();
-      if (Array.isArray(data.recipes)) {
+      if (data.timeout) {
+        setError(TIMEOUT_MESSAGE);
+      } else if (Array.isArray(data.recipes)) {
         setRecipes(data.recipes);
         setRecipeServings(servings);
         if (data.recipes.length === 0) {
@@ -207,9 +223,11 @@ export default function App() {
         setError('Something went wrong generating recipes. Try again.');
       }
     } catch (e) {
-      setError('Could not reach the server. Check your connection and try again.');
+      setError(e.name === 'AbortError' ? TIMEOUT_MESSAGE : 'Could not reach the server. Check your connection and try again.');
+    } finally {
+      clearTimeout(timeoutId);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (!fontsLoaded) {
