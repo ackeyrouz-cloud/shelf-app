@@ -46,6 +46,12 @@ const TIMES = [
   { v: '30', label: 'Under 30 min' },
   { v: '60', label: 'Under 1 hour' },
 ];
+const SERVINGS = [
+  { v: '1', label: '1' },
+  { v: '2', label: '2' },
+  { v: '4', label: '4' },
+  { v: '6+', label: '6+' },
+];
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -61,10 +67,12 @@ export default function App() {
   const [inputText, setInputText] = useState('');
   const [diets, setDiets] = useState(['none']);
   const [time, setTime] = useState('any');
+  const [servings, setServings] = useState('2');
   const [mood, setMood] = useState('');
   const [loading, setLoading] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [recipes, setRecipes] = useState([]);
+  const [recipeServings, setRecipeServings] = useState('2');
   const [openIndex, setOpenIndex] = useState(null);
   const [error, setError] = useState('');
 
@@ -158,11 +166,12 @@ export default function App() {
       const res = await fetch(`${API_BASE_URL}/find-recipes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pantry, diets, time, mood }),
+        body: JSON.stringify({ pantry, diets, time, mood, servings }),
       });
       const data = await res.json();
       if (Array.isArray(data.recipes)) {
         setRecipes(data.recipes);
+        setRecipeServings(servings);
         if (data.recipes.length === 0) {
           setError('No recipes matched every filter you chose — try loosening one and search again.');
         }
@@ -239,6 +248,9 @@ export default function App() {
             <FilterBlock title="Diet">
               <MultiChipRow options={DIETS} values={diets} onToggle={toggleDiet} />
             </FilterBlock>
+            <FilterBlock title="Servings" style={{ marginTop: 16 }}>
+              <ChipRow options={SERVINGS} value={servings} onChange={setServings} />
+            </FilterBlock>
             <FilterBlock title="Time" style={{ marginTop: 16 }}>
               <ChipRow options={TIMES} value={time} onChange={setTime} />
             </FilterBlock>
@@ -265,8 +277,9 @@ export default function App() {
           <View style={{ marginTop: 20 }}>
             {recipes.map((r, i) => (
               <RecipeCard
-                key={i}
+                key={`${r.title}-${i}`}
                 recipe={r}
+                servings={recipeServings}
                 open={openIndex === i}
                 onToggle={() => setOpenIndex(openIndex === i ? null : i)}
               />
@@ -338,17 +351,20 @@ function MultiChipRow({ options, values, onToggle }) {
   );
 }
 
-function RecipeCard({ recipe, open, onToggle }) {
+function RecipeCard({ recipe, servings, open, onToggle }) {
   const missing = recipe.missing || [];
   const usesFromShelf = recipe.usesFromShelf || [];
   const totalRelevant = usesFromShelf.length + missing.length;
   const ready = missing.length === 0;
+  const [checked, setChecked] = useState({});
+  const toggleIngredient = (i) => setChecked(prev => ({ ...prev, [i]: !prev[i] }));
+
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onToggle} style={[styles.recipe, !ready && styles.recipeNeedsBuy]}>
       <View style={styles.recipeTop}>
         <View style={{ flex: 1 }}>
           <Text style={styles.recipeTitle}>{recipe.title}</Text>
-          <Text style={styles.recipeMeta}>{recipe.time} · {recipe.difficulty}</Text>
+          <Text style={styles.recipeMeta}>{recipe.time} · {recipe.difficulty} · Serves {servings}</Text>
         </View>
         <View style={[styles.matchBadge, !ready && styles.matchBadgePartial]}>
           <Text style={[styles.matchBadgeText, !ready && styles.matchBadgeTextPartial]}>
@@ -371,11 +387,23 @@ function RecipeCard({ recipe, open, onToggle }) {
         <View style={styles.recipeDetail}>
           <Text style={styles.detailHeading}>Ingredients</Text>
           {(recipe.ingredients || []).map((ing, i) => (
-            <Text key={i} style={styles.detailLine}>·  {ing}</Text>
+            <TouchableOpacity
+              key={i}
+              style={styles.ingredientRow}
+              activeOpacity={0.6}
+              onPress={() => toggleIngredient(i)}
+            >
+              <View style={[styles.ingredientCheck, checked[i] && styles.ingredientCheckActive]} />
+              <Text style={[styles.ingredientText, checked[i] && styles.ingredientTextChecked]}>{ing}</Text>
+            </TouchableOpacity>
           ))}
-          <Text style={[styles.detailHeading, { marginTop: 12 }]}>Steps</Text>
+
+          <Text style={[styles.detailHeading, { marginTop: 18 }]}>Steps</Text>
           {(recipe.steps || []).map((s, i) => (
-            <Text key={i} style={styles.detailLine}>{i + 1}.  {s}</Text>
+            <View key={i} style={styles.stepRow}>
+              <View style={styles.stepNumber}><Text style={styles.stepNumberText}>{i + 1}</Text></View>
+              <Text style={styles.stepText}>{s}</Text>
+            </View>
           ))}
         </View>
       )}
@@ -462,7 +490,17 @@ const styles = StyleSheet.create({
   expandHint: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 12, color: COLORS.inkMuted, marginTop: 8 },
   recipeDetail: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: COLORS.hairline, borderStyle: 'dashed' },
   detailHeading: { fontFamily: 'WorkSans_700Bold', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: COLORS.forest, marginBottom: 8 },
-  detailLine: { fontFamily: 'WorkSans_400Regular', fontSize: 14, color: COLORS.ink, lineHeight: 21 },
+
+  ingredientRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 3, marginBottom: 6 },
+  ingredientCheck: { width: 14, height: 14, borderWidth: 1.5, borderColor: COLORS.ink, borderRadius: 2, backgroundColor: COLORS.cream },
+  ingredientCheckActive: { backgroundColor: COLORS.forest, borderColor: COLORS.forest },
+  ingredientText: { flex: 1, fontFamily: 'WorkSans_400Regular', fontSize: 14, color: COLORS.ink, lineHeight: 20 },
+  ingredientTextChecked: { color: COLORS.inkMuted, textDecorationLine: 'line-through' },
+
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 16 },
+  stepNumber: { width: 20, height: 20, marginTop: 1, borderWidth: 1.5, borderColor: COLORS.forest, borderRadius: 2, alignItems: 'center', justifyContent: 'center' },
+  stepNumberText: { fontFamily: 'JetBrainsMono_500Medium', fontSize: 11, color: COLORS.forest },
+  stepText: { flex: 1, fontFamily: 'WorkSans_400Regular', fontSize: 14, color: COLORS.ink, lineHeight: 21 },
 
   footer: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 11, color: COLORS.inkMuted, textAlign: 'center', marginTop: 32, letterSpacing: 0.5 },
 });

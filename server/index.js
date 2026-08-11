@@ -80,6 +80,29 @@ function findDietViolations(recipe, activeDiets) {
   return [...new Set(violations)];
 }
 
+// Parses "35 min", "1 hr 10 min", "45-50 min" (range → takes the upper bound), etc.
+// Returns null if nothing numeric is found — treated as "can't verify" downstream, not a violation.
+function parseTimeToMinutes(str) {
+  if (!str) return null;
+  const s = String(str).toLowerCase();
+  let minutes = 0;
+  const hourMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:hr|hour)/);
+  if (hourMatch) minutes += parseFloat(hourMatch[1]) * 60;
+
+  const rangeMatch = s.match(/(\d+)\s*[-–]\s*(\d+)\s*min/);
+  if (rangeMatch) {
+    minutes += Math.max(parseInt(rangeMatch[1], 10), parseInt(rangeMatch[2], 10));
+  } else {
+    const minMatch = s.match(/(\d+)\s*min/);
+    if (minMatch) minutes += parseInt(minMatch[1], 10);
+    else if (!hourMatch) {
+      const anyNum = s.match(/\d+/);
+      if (anyNum) minutes += parseInt(anyNum[0], 10);
+    }
+  }
+  return minutes > 0 ? minutes : null;
+}
+
 // POST /identify-ingredients  { base64, mediaType }
 app.post('/identify-ingredients', async (req, res) => {
   try {
@@ -115,17 +138,19 @@ If the photo doesn't show food or pantry items at all, respond with:
   }
 });
 
-// POST /find-recipes  { pantry: [], diets: [], time, mood }
+// POST /find-recipes  { pantry: [], diets: [], time, mood, servings }
 app.post('/find-recipes', async (req, res) => {
   try {
-    const { pantry, diets, time, mood } = req.body;
+    const { pantry, diets, time, mood, servings } = req.body;
     if (!Array.isArray(pantry) || pantry.length === 0) {
       return res.status(400).json({ error: 'Pantry list is required' });
     }
 
     const dietList = (Array.isArray(diets) ? diets : []).filter(d => d && d !== 'none');
     const dietText = dietList.length ? `must satisfy ALL of the following — ${dietList.join(', ')}` : 'no restriction';
-    const timeText = !time || time === 'any' ? 'no time limit' : `under ${time} minutes`;
+    const timeLimit = time && time !== 'any' ? parseInt(time, 10) : null;
+    const timeText = timeLimit ? `under ${timeLimit} minutes` : 'no time limit';
+    const serveText = servings === '6+' ? '6 or more' : (servings || '2');
     const dietCritical = dietList.length
       ? `\nCRITICAL: the diets listed above are non-negotiable dietary and religious restrictions. Under no circumstances suggest a recipe containing any ingredient that violates ANY selected diet, even if that ingredient is in the user's pantry. If an ingredient like pork, alcohol, or shellfish conflicts with a selected diet (e.g. Halal, vegetarian, vegan), you must exclude it entirely from every suggested recipe — do not list it in "ingredients", "usesFromShelf", or "missing", and do not suggest it as something to pick up either. When in doubt about whether an ingredient is compliant, leave it out.\n`
       : '';
@@ -133,9 +158,16 @@ app.post('/find-recipes', async (req, res) => {
     const prompt = `I have these ingredients available: ${pantry.join(', ')}.
 Dietary requirements: ${dietText}.
 Time constraint: ${timeText}.
+Servings needed: ${serveText} people.
 ${mood ? `Mood/style requested: ${mood}.` : ''}
 ${dietCritical}
 Suggest 4 real, cookable recipes, ranked with the recipe needing the FEWEST additional ingredients first. For each recipe assume basic staples (salt, pepper, oil, water) are always available and don't count as "missing".
+
+Every entry in "ingredients" must include a specific quantity and unit (e.g. "2 boneless chicken thighs", "1 cup jasmine rice", "1 tsp ground cumin") — never vague amounts like "some" or "a bit of". Scale every quantity exactly to serve ${serveText} people.
+
+The "time" field must be the realistic TOTAL time for an average home cook — prep (chopping, measuring, marinating start-to-finish where applicable) plus actual cook time, not just active cooking. Be honest, not optimistic: if a recipe genuinely takes 35 minutes, say "35 min" — don't round down to make it look faster. Round to the nearest 5 minutes. Cross-check "time" against your own step count and complexity — a recipe with 8 detailed steps, marinating, or simmering should not be labeled a quick 15-20 minute recipe. Format "time" as a single number of minutes, e.g. "35 min" (no ranges, no "1 hr 10 min" — convert to one total-minutes figure).${timeLimit ? ` Every recipe's "time" MUST be at or under ${timeLimit} minutes — this is a hard constraint, not a suggestion; if a recipe would realistically take longer, either simplify it or don't suggest it.` : ''}
+
+Every entry in "steps" must be exactly one clear action — never combine multiple actions into one sentence. Every step involving actual cooking (boiling, simmering, sautéing, baking, roasting, grilling, frying) must include a specific time range, e.g. "Simmer the rice, covered, for 15-18 minutes" rather than "cook the rice." For any step cooking meat, include both a time estimate AND a doneness cue — visual, tactile, or temperature-based (e.g. "Cook the chicken thighs for 6-7 minutes per side until the internal temperature reaches 165°F" or "until juices run clear and the center is no longer pink"). For staples like rice, pasta, and grains, use the standard accurate cook time for that ingredient (white rice ~15-18 min simmered, dried pasta ~8-11 min boiled). If meat needs to rest after cooking, state how long, e.g. "let rest for 5 minutes before slicing."
 
 Respond ONLY with a JSON array, no other text, in this exact shape:
 [
@@ -167,7 +199,19 @@ If a recipe needs nothing extra, "missing" should be an empty array.`;
       }
     }
 
-    res.json({ recipes: safeRecipes });
+    let timedRecipes = safeRecipes;
+    if (timeLimit) {
+      timedRecipes = safeRecipes.filter((r) => {
+        const mins = parseTimeToMinutes(r.time);
+        return mins === null || mins <= timeLimit;
+      });
+      const droppedForTime = safeRecipes.length - timedRecipes.length;
+      if (droppedForTime > 0) {
+        console.warn(`/find-recipes: filtered ${droppedForTime} recipe(s) exceeding the ${timeLimit}-minute limit`);
+      }
+    }
+
+    res.json({ recipes: timedRecipes });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to generate recipes' });
