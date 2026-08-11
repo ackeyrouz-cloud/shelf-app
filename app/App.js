@@ -12,9 +12,9 @@ import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from '@expo-google-
 // Point this at your deployed backend (see server/README.md).
 // Never call the Anthropic API directly from the app — the key must stay server-side.
 const API_BASE_URL = 'https://shelf-backend-97bp.onrender.com';
-// Longer than the server's own 25s Anthropic timeout, so a graceful timeout response
+// Longer than the server's own 45s Anthropic timeout, so a graceful timeout response
 // from the server has time to arrive before the client gives up on its own.
-const REQUEST_TIMEOUT_MS = 35000;
+const REQUEST_TIMEOUT_MS = 55000;
 const TIMEOUT_MESSAGE = 'This is taking longer than expected — please try again.';
 
 const COLORS = {

@@ -16,8 +16,11 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-5';
 // Node/undici's default fetch timeout is 5 minutes with no feedback to the user in that
 // window — cap it far below that so a stalled request fails fast with a clear message
-// instead of leaving the app looking hung.
-const ANTHROPIC_TIMEOUT_MS = 25000;
+// instead of leaving the app looking hung. 45s observed as a safe margin: even a plain,
+// unrestricted request took ~21s in testing (the detailed quantity/time/step instructions
+// apply to every request, not just diet-restricted ones), so this isn't just headroom for
+// worst-case diet prompts.
+const ANTHROPIC_TIMEOUT_MS = 45000;
 
 if (!ANTHROPIC_API_KEY) {
   console.warn('WARNING: ANTHROPIC_API_KEY is not set. Requests will fail.');
