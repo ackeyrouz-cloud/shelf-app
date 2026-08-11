@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   SafeAreaView, ScrollView, View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, Image, Platform, KeyboardAvoidingView
+  StyleSheet, ActivityIndicator, Alert, Platform, KeyboardAvoidingView
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -19,6 +19,7 @@ const COLORS = {
   ink: '#262922',
   inkMuted: '#5F6256',
   red: '#C1442A',
+  redDark: '#7a2a17',
   forest: '#2F4A3C',
   gold: '#D8A23A',
   white: '#FFFFFF',
@@ -502,7 +503,7 @@ const styles = StyleSheet.create({
   ctaText: { fontFamily: 'SpecialElite_400Regular', fontSize: 17, letterSpacing: 1, color: COLORS.cream, textTransform: 'uppercase' },
 
   errorBox: { marginTop: 16, backgroundColor: '#fbe9e5', borderWidth: 1, borderColor: COLORS.red, borderRadius: 3, padding: 12 },
-  errorText: { fontFamily: 'WorkSans_400Regular', fontSize: 13, color: '#7a2a17' },
+  errorText: { fontFamily: 'WorkSans_400Regular', fontSize: 13, color: COLORS.redDark },
 
   recipe: { backgroundColor: COLORS.cream, borderWidth: 1, borderColor: COLORS.hairline, borderLeftWidth: 4, borderLeftColor: COLORS.forest, borderRadius: 3, padding: 16, marginBottom: 12 },
   recipeNeedsBuy: { borderLeftColor: COLORS.gold },
