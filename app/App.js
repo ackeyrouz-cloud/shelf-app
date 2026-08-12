@@ -16,6 +16,7 @@ const API_BASE_URL = 'https://shelf-backend-97bp.onrender.com';
 // from the server has time to arrive before the client gives up on its own.
 const REQUEST_TIMEOUT_MS = 55000;
 const TIMEOUT_MESSAGE = 'This is taking longer than expected — please try again.';
+const OVERLOADED_MESSAGE = 'The recipe service is briefly overloaded — please try again in a moment.';
 
 const COLORS = {
   kraft: '#E7DEC6',
@@ -174,6 +175,8 @@ export default function App() {
       const data = await res.json();
       if (data.timeout) {
         setError(TIMEOUT_MESSAGE);
+      } else if (data.overloaded) {
+        setError(OVERLOADED_MESSAGE);
       } else if (data.notFood) {
         setError("That doesn't look like food — try another photo.");
       } else if (Array.isArray(data.items) && data.items.length) {
@@ -213,11 +216,18 @@ export default function App() {
       const data = await res.json();
       if (data.timeout) {
         setError(TIMEOUT_MESSAGE);
+      } else if (data.overloaded) {
+        setError(OVERLOADED_MESSAGE);
       } else if (Array.isArray(data.recipes)) {
         setRecipes(data.recipes);
         setRecipeServings(servings);
         if (data.recipes.length === 0) {
-          setError('No recipes matched every filter you chose — try loosening one and search again.');
+          if (data.dietMismatch) {
+            const activeDietLabels = diets.filter(d => d !== 'none').map(dietLabel).join(', ');
+            setError(`Your pantry doesn't have much that fits ${activeDietLabels}. Try adding more compatible ingredients or loosening your diet filter.`);
+          } else {
+            setError('No recipes matched every filter you chose — try loosening one and search again.');
+          }
         }
       } else {
         setError('Something went wrong generating recipes. Try again.');

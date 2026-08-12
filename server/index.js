@@ -39,7 +39,9 @@ async function callClaude(messages, maxTokens = 1000) {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Anthropic API error ${res.status}: ${text}`);
+    const err = new Error(`Anthropic API error ${res.status}: ${text}`);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
@@ -151,6 +153,9 @@ If the photo doesn't show food or pantry items at all, respond with:
     if (err.name === 'TimeoutError') {
       return res.status(504).json({ error: 'Request timed out', timeout: true });
     }
+    if (err.status === 529 || err.status === 503) {
+      return res.status(503).json({ error: 'Service overloaded', overloaded: true });
+    }
     res.status(500).json({ error: 'Failed to identify ingredients' });
   }
 });
@@ -216,16 +221,22 @@ If a recipe needs nothing extra, "missing" should be an empty array.`;
       // explanatory text instead of pure JSON — treat it the same as "no compliant recipes"
       // rather than surfacing an opaque 500.
       console.warn('/find-recipes: model response was not a valid recipe array, returning no recipes. Raw response:', String(textBlock.text).slice(0, 500));
-      return res.json({ recipes: [] });
+      return res.json({ recipes: [], dietMismatch: dietList.length > 0 });
     }
 
     const activeDiets = dietList.filter((d) => DIET_BLOCKLISTS[d]);
     let safeRecipes = recipes;
+    let dietMismatch = false;
     if (activeDiets.length) {
       safeRecipes = recipes.filter((r) => findDietViolations(r, activeDiets).length === 0);
       const dropped = recipes.length - safeRecipes.length;
       if (dropped > 0) {
         console.warn(`/find-recipes: filtered ${dropped} recipe(s) for violating ${activeDiets.join(', ')}`);
+      }
+      // Every generated recipe violated the diet(s) — not a bug, the pantry just doesn't
+      // have enough compliant ingredients to work with.
+      if (recipes.length > 0 && safeRecipes.length === 0) {
+        dietMismatch = true;
       }
     }
 
@@ -241,11 +252,14 @@ If a recipe needs nothing extra, "missing" should be an empty array.`;
       }
     }
 
-    res.json({ recipes: timedRecipes });
+    res.json({ recipes: timedRecipes, dietMismatch });
   } catch (err) {
     console.error(err);
     if (err.name === 'TimeoutError') {
       return res.status(504).json({ error: 'Request timed out', timeout: true });
+    }
+    if (err.status === 529 || err.status === 503) {
+      return res.status(503).json({ error: 'Service overloaded', overloaded: true });
     }
     res.status(500).json({ error: 'Failed to generate recipes' });
   }
