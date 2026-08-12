@@ -252,6 +252,19 @@ If a recipe needs nothing extra, "missing" should be an empty array.`;
       }
     }
 
+    // If every surviving recipe completely ignores the pantry (no usesFromShelf items at
+    // all), that's functionally the same failure as a diet mismatch — the model gave up
+    // trying to work with what's actually available and just generated generic recipes.
+    // Recipes using at least one pantry ingredient are left untouched and shown normally.
+    if (!dietMismatch && dietList.length > 0 && timedRecipes.length > 0) {
+      const allIgnorePantry = timedRecipes.every((r) => !(r.usesFromShelf || []).length);
+      if (allIgnorePantry) {
+        console.warn('/find-recipes: every recipe ignored the pantry (empty usesFromShelf), treating as diet mismatch');
+        dietMismatch = true;
+        timedRecipes = [];
+      }
+    }
+
     res.json({ recipes: timedRecipes, dietMismatch });
   } catch (err) {
     console.error(err);
