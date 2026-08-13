@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView, ScrollView, View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Platform, KeyboardAvoidingView
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { supabase } from './lib/supabase';
 import { useFonts, SpecialElite_400Regular } from '@expo-google-fonts/special-elite';
 import { WorkSans_400Regular, WorkSans_600SemiBold, WorkSans_700Bold } from '@expo-google-fonts/work-sans';
 import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from '@expo-google-fonts/jetbrains-mono';
@@ -31,7 +31,6 @@ const COLORS = {
   hairline: 'rgba(38,41,34,0.18)',
 };
 
-const STORAGE_KEY = 'shelf-pantry-items';
 const DIETS = [
   { v: 'none', label: 'No restriction' },
   { v: 'vegetarian', label: 'Vegetarian' },
@@ -56,6 +55,23 @@ const DIET_CONFLICTS = {
 };
 const dietLabel = (v) => (DIETS.find(d => d.v === v) || {}).label || v;
 
+// Case-insensitively filters candidate names down to ones not already in the pantry
+// (and not duplicated within the candidates themselves). Shared by addFromText and
+// the photo-scan merge, since both need the same "is this already here" rule.
+function dedupeNewItems(candidates, existingPantry) {
+  const existingLower = existingPantry.map(p => p.name.toLowerCase());
+  const result = [];
+  candidates.forEach(raw => {
+    const name = String(raw).trim();
+    if (!name) return;
+    const lower = name.toLowerCase();
+    if (existingLower.includes(lower)) return;
+    if (result.some(n => n.toLowerCase() === lower)) return;
+    result.push(name);
+  });
+  return result;
+}
+
 const TIMES = [
   { v: 'any', label: 'Any' },
   { v: '15', label: 'Under 15 min' },
@@ -79,7 +95,15 @@ export default function App() {
     JetBrainsMono_500Medium,
   });
 
+  // undefined = session not checked yet, null = signed out, object = signed in
+  const [session, setSession] = useState(undefined);
+  const userId = session?.user?.id;
+
+  // pantry items are { id, name } — id is the pantry_items row id, needed for delete
   const [pantry, setPantry] = useState([]);
+  const [pantryLoading, setPantryLoading] = useState(true);
+  const [pantryBusy, setPantryBusy] = useState(false);
+  const [pantryError, setPantryError] = useState('');
   const [inputText, setInputText] = useState('');
   const [diets, setDiets] = useState(['none']);
   const [time, setTime] = useState('any');
@@ -93,33 +117,69 @@ export default function App() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) setPantry(JSON.parse(raw));
-      } catch (e) { /* ignore */ }
-    })();
-  }, []);
-
-  const savePantry = useCallback(async (items) => {
-    setPantry(items);
-    try { await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items)); } catch (e) { /* ignore */ }
-  }, []);
-
-  const addFromText = () => {
-    if (!inputText.trim()) return;
-    const parts = inputText.split(',').map(s => s.trim()).filter(Boolean);
-    const next = [...pantry];
-    parts.forEach(p => {
-      if (!next.some(x => x.toLowerCase() === p.toLowerCase())) next.push(p);
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
     });
-    savePantry(next);
-    setInputText('');
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    setPantry([]);
+    setPantryError('');
+    setPantryLoading(true);
+    (async () => {
+      const { data, error: fetchError } = await supabase
+        .from('pantry_items')
+        .select('id, name')
+        .order('created_at', { ascending: true });
+      if (cancelled) return;
+      if (fetchError) {
+        setPantryError("Couldn't load your pantry. Check your connection and try again.");
+      } else {
+        setPantry(data || []);
+      }
+      setPantryLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  const addFromText = async () => {
+    if (!inputText.trim() || pantryBusy) return;
+    const parts = inputText.split(',').map(s => s.trim()).filter(Boolean);
+    const newNames = dedupeNewItems(parts, pantry);
+    if (newNames.length === 0) {
+      setInputText('');
+      return;
+    }
+    setPantryError('');
+    setPantryBusy(true);
+    const { data, error: insertError } = await supabase
+      .from('pantry_items')
+      .insert(newNames.map(name => ({ user_id: userId, name })))
+      .select('id, name');
+    if (insertError) {
+      setPantryError("Couldn't add that to your pantry. Check your connection and try again.");
+    } else {
+      setPantry(prev => [...prev, ...(data || [])]);
+      setInputText('');
+    }
+    setPantryBusy(false);
   };
 
-  const removeItem = (idx) => {
-    const next = pantry.filter((_, i) => i !== idx);
-    savePantry(next);
+  const removeItem = async (id) => {
+    if (pantryBusy) return;
+    setPantryError('');
+    setPantryBusy(true);
+    const { error: deleteError } = await supabase.from('pantry_items').delete().eq('id', id);
+    if (deleteError) {
+      setPantryError("Couldn't remove that item. Check your connection and try again.");
+    } else {
+      setPantry(prev => prev.filter(p => p.id !== id));
+    }
+    setPantryBusy(false);
   };
 
   const toggleDiet = (v) => {
@@ -180,11 +240,18 @@ export default function App() {
       } else if (data.notFood) {
         setError("That doesn't look like food — try another photo.");
       } else if (Array.isArray(data.items) && data.items.length) {
-        const next = [...pantry];
-        data.items.forEach(it => {
-          if (!next.some(x => x.toLowerCase() === String(it).toLowerCase())) next.push(it);
-        });
-        savePantry(next);
+        const newNames = dedupeNewItems(data.items, pantry);
+        if (newNames.length > 0) {
+          const { data: inserted, error: insertError } = await supabase
+            .from('pantry_items')
+            .insert(newNames.map(name => ({ user_id: userId, name })))
+            .select('id, name');
+          if (insertError) {
+            setError("Identified items, but couldn't save them to your pantry. Try again.");
+          } else {
+            setPantry(prev => [...prev, ...(inserted || [])]);
+          }
+        }
       } else {
         setError("Couldn't identify anything in that photo — try typing instead.");
       }
@@ -210,7 +277,7 @@ export default function App() {
       const res = await fetch(`${API_BASE_URL}/find-recipes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pantry, diets, time, mood, servings }),
+        body: JSON.stringify({ pantry: pantry.map(p => p.name), diets, time, mood, servings }),
         signal: controller.signal,
       });
       const data = await res.json();
@@ -240,12 +307,16 @@ export default function App() {
     }
   };
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || session === undefined) {
     return (
       <SafeAreaView style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator color={COLORS.red} />
       </SafeAreaView>
     );
+  }
+
+  if (!session) {
+    return <AuthScreen />;
   }
 
   return (
@@ -272,7 +343,7 @@ export default function App() {
                 returnKeyType="done"
                 maxLength={120}
               />
-              <TouchableOpacity style={styles.addBtn} onPress={addFromText}>
+              <TouchableOpacity style={styles.addBtn} onPress={addFromText} disabled={pantryBusy}>
                 <Text style={styles.addBtnText}>Add</Text>
               </TouchableOpacity>
             </View>
@@ -283,21 +354,31 @@ export default function App() {
                 : <Text style={styles.photoBtnText}>Or snap a photo of your shelf</Text>}
             </TouchableOpacity>
 
-            <View style={styles.tags}>
-              {pantry.map((item, i) => (
-                <View key={item + i} style={styles.tag}>
-                  <Text style={styles.tagText}>{item}</Text>
-                  <TouchableOpacity
-                    onPress={() => removeItem(i)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    style={styles.tagRemoveHit}
-                  >
-                    <Text style={styles.tagRemove}>✕</Text>
-                  </TouchableOpacity>
+            {pantryLoading ? (
+              <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.red} />
+            ) : (
+              <>
+                <View style={styles.tags}>
+                  {pantry.map((item) => (
+                    <View key={item.id} style={styles.tag}>
+                      <Text style={styles.tagText}>{item.name}</Text>
+                      <TouchableOpacity
+                        onPress={() => removeItem(item.id)}
+                        disabled={pantryBusy}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        style={styles.tagRemoveHit}
+                      >
+                        <Text style={styles.tagRemove}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-            {pantry.length === 0 && <Text style={styles.emptyNote}>Nothing added yet — start typing above.</Text>}
+                {pantry.length === 0 && <Text style={styles.emptyNote}>Nothing added yet — start typing above.</Text>}
+              </>
+            )}
+            {!!pantryError && (
+              <View style={styles.errorBox}><Text style={styles.errorText}>{pantryError}</Text></View>
+            )}
           </View>
 
           <SectionLabel text="Filters" />
@@ -344,6 +425,110 @@ export default function App() {
           </View>
 
           <Text style={styles.footer}>SHELF · COOK FROM WHAT'S ALREADY THERE</Text>
+          <TouchableOpacity onPress={() => supabase.auth.signOut()} style={{ marginTop: 12, alignItems: 'center' }}>
+            <Text style={styles.expandHint}>Sign out</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+function AuthScreen() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState('signin');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+
+  const submit = async () => {
+    if (!email.trim() || !password) {
+      setError('Enter your email and password.');
+      return;
+    }
+    setError('');
+    setMessage('');
+    setLoading(true);
+    try {
+      if (mode === 'signup') {
+        const { data, error: signUpError } = await supabase.auth.signUp({ email: email.trim(), password });
+        if (signUpError) {
+          setError(signUpError.message);
+        } else if (!data.session) {
+          // No session back means email confirmation is required before sign-in works.
+          // If confirmation is off, data.session is already set and onAuthStateChange
+          // will transition straight into the app — no message needed.
+          setMessage('Check your email to confirm your account, then sign in.');
+        }
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (signInError) setError(signInError.message);
+      }
+    } catch (e) {
+      setError('Something went wrong. Check your connection and try again.');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={[styles.wrap, { flexGrow: 1, justifyContent: 'center' }]} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <View style={styles.stamp}><Text style={styles.stampText}>USE WHAT YOU HAVE</Text></View>
+            <Text style={styles.h1}>Shelf</Text>
+            <Text style={styles.tagline}>
+              {mode === 'signup' ? 'Create an account to save your pantry and preferences.' : 'Sign in to pick up where you left off.'}
+            </Text>
+          </View>
+
+          <View style={styles.card}>
+            <FilterBlock title="Email">
+              <TextInput
+                style={styles.input}
+                placeholder="you@example.com"
+                placeholderTextColor={COLORS.inkMuted}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+              />
+            </FilterBlock>
+            <FilterBlock title="Password" style={{ marginTop: 16 }}>
+              <TextInput
+                style={styles.input}
+                placeholder="At least 6 characters"
+                placeholderTextColor={COLORS.inkMuted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </FilterBlock>
+          </View>
+
+          <TouchableOpacity style={styles.cta} onPress={submit} disabled={loading}>
+            <Text style={styles.ctaText}>{loading ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Sign in'}</Text>
+          </TouchableOpacity>
+
+          {loading && <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.red} />}
+          {!!error && (
+            <View style={styles.errorBox}><Text style={styles.errorText}>{error}</Text></View>
+          )}
+          {!!message && (
+            <View style={styles.errorBox}><Text style={styles.errorText}>{message}</Text></View>
+          )}
+
+          <TouchableOpacity
+            style={{ marginTop: 20, alignItems: 'center' }}
+            onPress={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setError(''); setMessage(''); }}
+          >
+            <Text style={styles.expandHint}>
+              {mode === 'signup' ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -524,8 +709,8 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: COLORS.ink, borderColor: COLORS.ink },
   chipCheck: { width: 10, height: 10, borderWidth: 1.5, borderColor: COLORS.ink, borderRadius: 1 },
   chipCheckActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
-  chipText: { fontFamily: 'JetBrainsMono_400Regular', fontSize: 12, letterSpacing: 0.5, textTransform: 'uppercase', color: COLORS.ink },
-  chipTextActive: { fontFamily: 'JetBrainsMono_500Medium', color: COLORS.cream },
+  chipText: { fontFamily: 'WorkSans_400Regular', fontSize: 12, color: COLORS.ink },
+  chipTextActive: { fontFamily: 'WorkSans_600SemiBold', color: COLORS.cream },
 
   cta: { marginTop: 24, backgroundColor: COLORS.red, borderRadius: 3, paddingVertical: 16, alignItems: 'center' },
   ctaText: { fontFamily: 'SpecialElite_400Regular', fontSize: 17, letterSpacing: 1, color: COLORS.cream, textTransform: 'uppercase' },
