@@ -90,6 +90,20 @@ function findDietViolations(recipe, activeDiets) {
   return [...new Set(violations)];
 }
 
+// The model occasionally omits or malforms a macro field (string, negative,
+// NaN) even when instructed not to. Rather than reject an otherwise-good
+// recipe over that, strip just the bad field so the client's "only render if
+// present" check (recipe.calories != null) quietly hides that one badge.
+function sanitizeMacros(recipe) {
+  const clean = { ...recipe };
+  for (const field of ['calories', 'proteinG', 'carbsG', 'fatG']) {
+    const n = Number(clean[field]);
+    if (!Number.isFinite(n) || n <= 0) delete clean[field];
+    else clean[field] = n;
+  }
+  return clean;
+}
+
 // Parses "35 min", "1 hr 10 min", "45-50 min" (range → takes the upper bound), etc.
 // Returns null if nothing numeric is found — treated as "can't verify" downstream, not a violation.
 function parseTimeToMinutes(str) {
@@ -191,6 +205,8 @@ The "time" field must be the realistic TOTAL time for an average home cook — p
 
 Every entry in "steps" must be exactly one clear action — never combine multiple actions into one sentence. Every step involving actual cooking (boiling, simmering, sautéing, baking, roasting, grilling, frying) must include a specific time range, e.g. "Simmer the rice, covered, for 15-18 minutes" rather than "cook the rice." For any step cooking meat, include both a time estimate AND a doneness cue — visual, tactile, or temperature-based (e.g. "Cook the chicken thighs for 6-7 minutes per side until the internal temperature reaches 165°F" or "until juices run clear and the center is no longer pink"). For staples like rice, pasta, and grains, use the standard accurate cook time for that ingredient (white rice ~15-18 min simmered, dried pasta ~8-11 min boiled). If meat needs to rest after cooking, state how long, e.g. "let rest for 5 minutes before slicing."
 
+For each recipe, estimate realistic nutrition PER SERVING (i.e. for one of the ${serveText} servings, not the whole recipe) based on the actual ingredients and quantities in "ingredients": total calories, protein in grams, carbs in grams, and fat in grams. Use standard nutrition data for common ingredients. These are reasonable estimates, not lab-precision figures, but calories must be internally consistent with the macros — roughly (protein × 4) + (carbs × 4) + (fat × 9), within about 10%.
+
 Respond ONLY with a JSON array, no other text, in this exact shape:
 [
   {
@@ -200,11 +216,16 @@ Respond ONLY with a JSON array, no other text, in this exact shape:
     "usesFromShelf": ["ingredient1","ingredient2"],
     "missing": ["ingredient you'd need to buy"],
     "ingredients": ["full ingredient list with quantities, for the whole recipe"],
-    "steps": ["step 1", "step 2", "step 3"]
+    "steps": ["step 1", "step 2", "step 3"],
+    "calories": 520,
+    "proteinG": 38,
+    "carbsG": 46,
+    "fatG": 18
   }
 ]
 "usesFromShelf" must list only items copied from the ingredients I have available above — not staples, not missing items.
-If a recipe needs nothing extra, "missing" should be an empty array.`;
+If a recipe needs nothing extra, "missing" should be an empty array.
+"calories", "proteinG", "carbsG", and "fatG" are per serving and must be positive numbers, not strings or ranges.`;
 
     const data = await callClaude([{ role: 'user', content: prompt }], 4096);
     const textBlock = (data.content || []).find((b) => b.type === 'text');
@@ -265,7 +286,7 @@ If a recipe needs nothing extra, "missing" should be an empty array.`;
       }
     }
 
-    res.json({ recipes: timedRecipes, dietMismatch });
+    res.json({ recipes: timedRecipes.map(sanitizeMacros), dietMismatch });
   } catch (err) {
     console.error(err);
     if (err.name === 'TimeoutError') {

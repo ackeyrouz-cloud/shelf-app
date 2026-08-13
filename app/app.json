@@ -5,11 +5,11 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#E7DEC6"
+      "backgroundColor": "#1C1917"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -24,7 +24,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#E7DEC6"
+        "backgroundColor": "#1C1917"
       },
       "package": "com.yourname.shelf",
       "permissions": [
