@@ -65,7 +65,7 @@ export function FoodDetailScreen({ navigation, route }) {
       recipeTitle: food.name,
       servings: 1,
       macros: { calories: scaled.calories, proteinG: scaled.proteinG, carbsG: scaled.carbsG, fatG: scaled.fatG, fiberG: scaled.fiberG },
-      source: food.source === 'voice' ? 'voice' : 'search',
+      source: food.source === 'voice' ? 'voice' : food.source === 'photo' ? 'photo' : 'search',
       isEstimated: !!food.isEstimated,
       base: {
         caloriesPer100: food.caloriesPer100, proteinPer100: food.proteinPer100,

@@ -11,6 +11,7 @@ import { FoodSearchScreen } from '../screens/logging/FoodSearchScreen';
 import { FoodDetailScreen } from '../screens/logging/FoodDetailScreen';
 import { BarcodeScannerScreen } from '../screens/logging/BarcodeScannerScreen';
 import { DescribeMealScreen } from '../screens/logging/DescribeMealScreen';
+import { PhotoMealScreen } from '../screens/logging/PhotoMealScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -43,6 +44,7 @@ export function MainStackNavigator() {
       <Stack.Screen name="FoodDetail" component={FoodDetailScreen} />
       <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
       <Stack.Screen name="DescribeMeal" component={DescribeMealScreen} />
+      <Stack.Screen name="PhotoMeal" component={PhotoMealScreen} />
     </Stack.Navigator>
   );
 }

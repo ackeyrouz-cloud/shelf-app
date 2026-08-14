@@ -43,7 +43,16 @@ export async function searchFoods(query, { signal } = {}) {
 // instead rather than a quantity picker with nothing to scale from.
 export function foodFromRecentLog(log) {
   if (log.base_calories_per_100 == null) return null;
-  const source = log.custom_food_id ? 'custom' : log.off_code ? 'off' : log.usda_id ? 'usda' : 'voice';
+  // Sub-sources ('off'/'usda') are used over the generic 'search' bucket so
+  // FoodDetailScreen's named-serving re-fetch (gated on source === 'off')
+  // still fires for a reopened Open Food Facts item. photo/voice are read
+  // directly off the row's own source column rather than inferred, since
+  // neither sets off_code/usda_id/custom_food_id to distinguish them.
+  const source = log.custom_food_id ? 'custom'
+    : log.off_code ? 'off'
+    : log.usda_id ? 'usda'
+    : log.source === 'photo' ? 'photo'
+    : 'voice';
   return {
     id: `log:${log.id}`,
     source,

@@ -8,8 +8,7 @@ import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 const ICON_SETS = { Feather, MaterialCommunityIcons };
 
 // Hub for how to log a meal — Search, Enter Manually, Scan Barcode, Describe
-// a Meal; photo gets added here as its own row once that's built, rather
-// than each needing their own separate entry point on Profile.
+// a Meal, Photo Estimate.
 function MethodRow({ colors, styles, icon, iconFamily = 'Feather', iconColor, label, sublabel, onPress }) {
   const IconComponent = ICON_SETS[iconFamily];
   const handlePress = () => { Haptics.selectionAsync(); onPress(); };
@@ -80,6 +79,15 @@ export function LogMealMethodScreen({ navigation }) {
             label="Describe a meal"
             sublabel="Describe what you ate, get an estimate"
             onPress={() => navigation.navigate('DescribeMeal')}
+          />
+          <MethodRow
+            colors={colors}
+            styles={styles}
+            icon="camera"
+            iconColor={colors.carbs}
+            label="Photo estimate"
+            sublabel="Snap a photo, get a rough estimate"
+            onPress={() => navigation.navigate('PhotoMeal')}
           />
         </View>
       </View>

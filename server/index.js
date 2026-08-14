@@ -635,6 +635,106 @@ If (and only if) you genuinely cannot estimate at all:
   }
 });
 
+// POST /estimate-meal-photo  { base64, mediaType, caption }
+// Photo estimation is the least reliable of the five logging methods — no
+// portion-size reference, hidden ingredients (oil, dressing, sauce) usually
+// aren't visible at all — so this deliberately doesn't offer a clarifying
+// question the way /estimate-meal does (there's no good UI for a follow-up
+// about a photo). Genuinely unreadable photos fail outright with a message
+// pointing at "Describe a meal" as the fallback, rather than guessing wildly
+// or inventing a photo-specific mini-chat.
+app.post('/estimate-meal-photo', async (req, res) => {
+  try {
+    const { base64, mediaType, caption } = req.body;
+    if (!base64) return res.status(400).json({ error: 'Missing image data' });
+
+    const captionText = caption && String(caption).trim()
+      ? `\nThe user also added this note: "${String(caption).trim()}"`
+      : '';
+
+    const prompt = `Look at this photo of food and estimate its nutrition. This is inherently uncertain — you can't know exact ingredients, cooking method, or portion weight for certain from a photo alone, only make your best visual judgment.${captionText}
+
+If you can identify the food(s) clearly enough to make a reasonable estimate, calculate nutrition using a careful method:
+1. Identify the visible food component(s) and judge the portion size from visual cues (plate/bowl size, comparison to typical servings, any hands/utensils visible for scale).
+2. Estimate each component's calorie/protein/carb/fat/fiber contribution using real per-100g nutrition values, accounting for visible preparation (fried vs. grilled, sauce, cheese, etc.) — but be upfront with yourself that anything not visible (oil used in cooking, dressing mixed in, seasoning) cannot be accounted for precisely and should be estimated at a typical/moderate level, not ignored.
+3. Sum the components, then divide by the total estimated weight in grams to get per-100g values.
+4. Cross-check: calories should land within about 10% of (protein × 4) + (carbs × 4) + (fat × 9). Fiber is a subset of carb grams, not additional calories.
+5. Report your best estimate of the total weight in grams for the portion shown.
+
+Respond ONLY with compact JSON, no other text, in exactly one of these two shapes:
+
+If you can produce a reasonable estimate:
+{"canEstimate":true,"name":"Grilled Chicken with Rice","caloriesPer100":165,"proteinPer100":18,"carbsPer100":12,"fatPer100":4,"fiberPer100":1,"estimatedGrams":400,"isBeverage":false}
+
+If the photo doesn't show food clearly enough to estimate at all (blurry, not food, too obscured):
+{"canEstimate":false}
+
+"name" should be a clean, short name for what's shown. "isBeverage" should be true only for actual drinks. All numeric fields are required and must be positive numbers when canEstimate is true.`;
+
+    const data = await callClaude([
+      {
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType || 'image/jpeg', data: base64 } },
+          { type: 'text', text: prompt },
+        ],
+      },
+      // Same reasoning-heavy budget as /estimate-meal, not the 500 used by
+      // /identify-ingredients' much simpler "just list what you see" task —
+      // confirmed live that this class of step-by-step nutrition reasoning
+      // needs real headroom or the model's thinking consumes the whole budget.
+    ], 2000);
+
+    const textBlock = (data.content || []).find((b) => b.type === 'text');
+    if (!textBlock) {
+      console.error('/estimate-meal-photo: no text block in response. stop_reason:', data.stop_reason, '| content:', JSON.stringify(data.content).slice(0, 500));
+      return res.status(502).json({ error: 'Could not produce an estimate' });
+    }
+
+    let parsed;
+    try {
+      parsed = extractJson(textBlock.text);
+    } catch (parseErr) {
+      console.warn('/estimate-meal-photo: model response was not valid JSON. Raw response:', String(textBlock.text).slice(0, 500));
+      return res.status(502).json({ error: 'Could not produce an estimate' });
+    }
+
+    if (!parsed.canEstimate) {
+      return res.json({ canEstimate: false });
+    }
+
+    const calories = Number(parsed.caloriesPer100);
+    const grams = Number(parsed.estimatedGrams);
+    if (!Number.isFinite(calories) || calories <= 0 || !Number.isFinite(grams) || grams <= 0) {
+      console.warn('/estimate-meal-photo: model returned an incomplete estimate. Raw response:', String(textBlock.text).slice(0, 500));
+      return res.json({ canEstimate: false });
+    }
+
+    res.json({
+      canEstimate: true,
+      estimate: {
+        name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : 'Meal from photo',
+        caloriesPer100: calories,
+        proteinPer100: Number.isFinite(Number(parsed.proteinPer100)) ? Number(parsed.proteinPer100) : 0,
+        carbsPer100: Number.isFinite(Number(parsed.carbsPer100)) ? Number(parsed.carbsPer100) : 0,
+        fatPer100: Number.isFinite(Number(parsed.fatPer100)) ? Number(parsed.fatPer100) : 0,
+        fiberPer100: Number.isFinite(Number(parsed.fiberPer100)) ? Number(parsed.fiberPer100) : null,
+        estimatedGrams: grams,
+        isBeverage: !!parsed.isBeverage,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    if (err.name === 'TimeoutError') {
+      return res.status(504).json({ error: 'Request timed out', timeout: true });
+    }
+    if (err.status === 529 || err.status === 503) {
+      return res.status(503).json({ error: 'Service overloaded', overloaded: true });
+    }
+    res.status(500).json({ error: 'Failed to estimate nutrition from photo' });
+  }
+});
+
 // POST /delete-account  Authorization: Bearer <supabase access token>
 // Deleting the auth.users row cascades to profiles, pantry_items, and
 // meal_logs automatically — all three have `on delete cascade` foreign keys
