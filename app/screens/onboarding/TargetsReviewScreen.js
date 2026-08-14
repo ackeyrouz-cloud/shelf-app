@@ -47,7 +47,7 @@ export function TargetsReviewScreen({ navigation }) {
           )}
 
           <View style={{ alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
-            <MacroRing calories={calories} />
+            <MacroRing value={calories} />
           </View>
 
           <View style={{ marginTop: 12 }}>

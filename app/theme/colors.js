@@ -21,6 +21,7 @@ export const COLORS = {
   protein: '#FB923C',
   carbs: '#2DD4BF',
   fat: '#C084FC',           // also the Profile tab's color
+  fiber: '#A3E635',         // lime — distinct from success-green and premium-gold
 
   destructive: '#F87171',
 

@@ -8,6 +8,7 @@ import { FONTS } from '../theme/fonts';
 import { common } from '../theme/common';
 import { MacroRing } from './MacroRing';
 import { MacroBar } from './MacroBar';
+import { LogMealButton } from './LogMealButton';
 
 export function RecipeCard({ recipe, servings, open, onToggle }) {
   const missing = recipe.missing || [];
@@ -63,10 +64,9 @@ export function RecipeCard({ recipe, servings, open, onToggle }) {
         <Text style={styles.missingLine}>Pick up: <Text style={{ fontFamily: FONTS.bodyBold, color: COLORS.premium }}>{missing.join(', ')}</Text></Text>
       )}
 
-      {/* UI slot for Phase 4's backend macro fields — renders only once a
-          recipe actually carries this data, using the same fixed macro
-          colors as everywhere else in the app. */}
-      {recipe.calories != null && (
+      {/* Collapsed compact macro view — hidden once expanded, where the
+          fuller ring+bars section below covers the same data. */}
+      {!open && recipe.calories != null && (
         <View style={styles.macroChips}>
           <View style={styles.macroChip}>
             <Text style={styles.macroChipLabel}>KCAL</Text>
@@ -93,8 +93,17 @@ export function RecipeCard({ recipe, servings, open, onToggle }) {
               <Text style={styles.macroChipValue}>{Math.round(recipe.fatG)}g</Text>
             </View>
           )}
+          {recipe.fiberG != null && (
+            <View style={styles.macroChip}>
+              <View style={[styles.macroDot, { backgroundColor: COLORS.fiber }]} />
+              <Text style={styles.macroChipLabel}>FIBER</Text>
+              <Text style={styles.macroChipValue}>{Math.round(recipe.fiberG)}g</Text>
+            </View>
+          )}
         </View>
       )}
+
+      {!open && <LogMealButton recipe={recipe} />}
 
       <View style={styles.expandRow}>
         <Text style={common.expandHint}>{open ? 'Tap to collapse' : 'Tap for full recipe'}</Text>
@@ -106,11 +115,22 @@ export function RecipeCard({ recipe, servings, open, onToggle }) {
           {recipe.calories != null && (
             <View style={styles.fullMacros}>
               <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                <MacroRing calories={recipe.calories} size={104} label="KCAL / SERVING" />
+                <MacroRing value={recipe.calories} size={104} label="KCAL / SERVING" />
               </View>
               {recipe.proteinG != null && <MacroBar label="Protein" grams={recipe.proteinG} kcalPerGram={4} totalCalories={recipe.calories} color={COLORS.protein} />}
               {recipe.carbsG != null && <MacroBar label="Carbs" grams={recipe.carbsG} kcalPerGram={4} totalCalories={recipe.calories} color={COLORS.carbs} />}
               {recipe.fatG != null && <MacroBar label="Fat" grams={recipe.fatG} kcalPerGram={9} totalCalories={recipe.calories} color={COLORS.fat} />}
+              {/* Fiber has no separate calorie share to fill a composition
+                  bar with (it's already counted inside carbs) — a plain
+                  stat is the honest treatment here, not a bar stuck at 0%. */}
+              {recipe.fiberG != null && (
+                <View style={styles.fiberStat}>
+                  <View style={[styles.macroDot, { backgroundColor: COLORS.fiber, marginBottom: 0 }]} />
+                  <Text style={styles.fiberStatLabel}>FIBER</Text>
+                  <Text style={styles.fiberStatValue}>{Math.round(recipe.fiberG)}g</Text>
+                </View>
+              )}
+              <LogMealButton recipe={recipe} />
             </View>
           )}
 
@@ -169,6 +189,9 @@ const styles = StyleSheet.create({
   macroDot: { width: 6, height: 6, borderRadius: 3, marginBottom: 4 },
   macroChipLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5, color: COLORS.inkMuted },
   macroChipValue: { fontFamily: FONTS.displaySemiBold, fontSize: 13, color: COLORS.ink, marginTop: 2 },
+  fiberStat: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 2 },
+  fiberStatLabel: { fontFamily: FONTS.bodyBold, fontSize: 11.5, letterSpacing: 0.6, color: COLORS.inkMuted },
+  fiberStatValue: { fontFamily: FONTS.displaySemiBold, fontSize: 14, color: COLORS.ink, marginLeft: 'auto' },
   expandRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
   recipeDetail: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: COLORS.hairline },
   fullMacros: { marginBottom: 20 },

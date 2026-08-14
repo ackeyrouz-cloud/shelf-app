@@ -4,17 +4,22 @@ import Svg, { Circle } from 'react-native-svg';
 import { COLORS } from '../theme/colors';
 import { FONTS } from '../theme/fonts';
 
-// Decorative framing arc, not a data-encoded "progress" value — there's no
-// consumption to compare against, only the target/estimate itself. The
-// a11y-critical value is the number rendered in the center.
+// Decorative framing arc used when there's no target to compare against
+// (setting a target, or a recipe's flat per-serving calorie count) — not a
+// data-encoded progress value in that case.
 const DECORATIVE_ARC_FRACTION = 0.82;
 
-export function MacroRing({ calories, size = 148, label = 'KCAL / DAY' }) {
+// `target` is optional. Provide it (daily consumed vs. daily target) and the
+// ring becomes a real progress arc with a "consumed / target" center label,
+// matching the bar components below it. Omit it and the ring falls back to
+// the original flat display: a single number + unit label, decorative arc.
+export function MacroRing({ value, target, size = 148, unit = 'KCAL', label = 'KCAL / DAY' }) {
   const stroke = Math.max(6, Math.round(size * 0.08));
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const dashoffset = circumference * (1 - DECORATIVE_ARC_FRACTION);
-  const valueFontSize = Math.round(size * 0.2);
+  const fraction = target > 0 ? Math.max(0, Math.min(1, value / target)) : DECORATIVE_ARC_FRACTION;
+  const dashoffset = circumference * (1 - fraction);
+  const valueFontSize = Math.round(size * (target > 0 ? 0.18 : 0.2));
   const labelFontSize = Math.max(8, Math.round(size * 0.068));
 
   return (
@@ -36,8 +41,12 @@ export function MacroRing({ calories, size = 148, label = 'KCAL / DAY' }) {
         />
       </Svg>
       <View style={styles.center} pointerEvents="none">
-        <Text style={[styles.value, { fontSize: valueFontSize }]}>{Math.round(calories)}</Text>
-        <Text style={[styles.label, { fontSize: labelFontSize }]}>{label}</Text>
+        <Text style={[styles.value, { fontSize: valueFontSize }]}>{Math.round(value)}</Text>
+        {target > 0 ? (
+          <Text style={[styles.label, { fontSize: labelFontSize }]}>/ {Math.round(target)} {unit}</Text>
+        ) : (
+          <Text style={[styles.label, { fontSize: labelFontSize }]}>{label}</Text>
+        )}
       </View>
     </View>
   );
