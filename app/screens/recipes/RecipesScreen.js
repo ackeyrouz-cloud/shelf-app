@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   SafeAreaView, ScrollView, View, Text, TextInput,
   ActivityIndicator, Platform, KeyboardAvoidingView,
@@ -21,10 +21,14 @@ export function RecipesScreen() {
   const [servings, setServings] = useState('2');
   const [mood, setMood] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [recipes, setRecipes] = useState([]);
   const [recipeServings, setRecipeServings] = useState('2');
   const [openIndex, setOpenIndex] = useState(null);
   const [error, setError] = useState('');
+  const loadingTimers = useRef([]);
+
+  useEffect(() => () => loadingTimers.current.forEach(clearTimeout), []);
 
   const toggleDiet = (v) => {
     if (v === 'none') {
@@ -58,6 +62,14 @@ export function RecipesScreen() {
     setError('');
     setRecipes([]);
     setLoading(true);
+    // Generation now realistically takes up to ~60-90s for 6 detailed
+    // recipes with full nutrition — a static "Looking…" that never changes
+    // reads as broken well before the real (now much longer) timeout fires.
+    setLoadingMessage("Looking through what you've got…");
+    loadingTimers.current.push(
+      setTimeout(() => setLoadingMessage('Still working — writing out full recipes and nutrition info can take a moment…'), 10000),
+      setTimeout(() => setLoadingMessage('Almost there — hang tight for a few more seconds…'), 30000),
+    );
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
@@ -96,6 +108,8 @@ export function RecipesScreen() {
       setError(e.name === 'AbortError' ? TIMEOUT_MESSAGE : 'Could not reach the server. Check your connection and try again.');
     } finally {
       clearTimeout(timeoutId);
+      loadingTimers.current.forEach(clearTimeout);
+      loadingTimers.current = [];
       setLoading(false);
     }
   };
@@ -135,7 +149,12 @@ export function RecipesScreen() {
 
           <PrimaryButton label={loading ? 'Looking…' : 'Find Recipes'} onPress={findRecipes} disabled={loading} />
 
-          {loading && <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />}
+          {loading && (
+            <>
+              <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />
+              <Text style={[common.tagline, { textAlign: 'center', marginTop: 10 }]}>{loadingMessage}</Text>
+            </>
+          )}
           {!!error && (
             <View style={common.errorBox}><Text style={common.errorText}>{error}</Text></View>
           )}

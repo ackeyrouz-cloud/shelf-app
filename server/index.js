@@ -15,6 +15,11 @@ app.use(express.json({ limit: '10mb' }));
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-5';
+// Raised from 4: reliability was the higher priority (see ANTHROPIC_TIMEOUT_MS
+// below), so this moved up moderately, not all the way to 8, to keep
+// generation time growth proportional and comfortably inside the new timeout
+// rather than trading one reliability problem for another.
+const RECIPE_COUNT = 6;
 
 // Same project the app itself talks to (app/lib/supabase.js) — URL and anon
 // key are not secret, they're already embedded in the client bundle. The
@@ -40,11 +45,13 @@ if (!SUPABASE_SERVICE_ROLE_KEY) {
 }
 // Node/undici's default fetch timeout is 5 minutes with no feedback to the user in that
 // window — cap it far below that so a stalled request fails fast with a clear message
-// instead of leaving the app looking hung. 45s observed as a safe margin: even a plain,
-// unrestricted request took ~21s in testing (the detailed quantity/time/step instructions
-// apply to every request, not just diet-restricted ones), so this isn't just headroom for
-// worst-case diet prompts.
-const ANTHROPIC_TIMEOUT_MS = 45000;
+// instead of leaving the app looking hung. Raised from 45s to 100s after confirming via
+// Render logs that the 45s ceiling itself was the failure — real DOMException[TimeoutError]
+// entries from this exact AbortSignal, meaning generation was routinely taking ~45s+ and
+// getting killed before it could finish, not a genuinely stuck/hung request. That 45s figure
+// was calibrated before ingredient-by-ingredient nutrition reasoning and 6-recipe variety
+// requirements were added to the prompt, both of which meaningfully lengthen generation.
+const ANTHROPIC_TIMEOUT_MS = 100000;
 
 if (!ANTHROPIC_API_KEY) {
   console.warn('WARNING: ANTHROPIC_API_KEY is not set. Requests will fail.');
@@ -230,7 +237,9 @@ Time constraint: ${timeText}.
 Servings needed: ${serveText} people.
 ${mood ? `Mood/style requested: ${mood}.` : ''}
 ${dietCritical}
-Suggest 4 real, cookable recipes, ranked with the recipe needing the FEWEST additional ingredients first. For each recipe assume basic staples (salt, pepper, oil, water) are always available and don't count as "missing".
+Suggest ${RECIPE_COUNT} real, cookable recipes, ranked with the recipe needing the FEWEST additional ingredients first. For each recipe assume basic staples (salt, pepper, oil, water) are always available and don't count as "missing".
+
+Make the ${RECIPE_COUNT} recipes genuinely diverse from each other, not variations on the same dish — vary cuisine style, cooking method, and which pantry ingredient takes the lead role wherever the pantry actually supports it. Do not suggest near-duplicates of each other (e.g. four different techniques for the same scrambled eggs) unless the pantry is small enough that it genuinely only supports one type of dish — in that case, prioritize being realistic over forcing artificial variety.
 
 Every entry in "ingredients" must include a specific quantity and unit (e.g. "2 boneless chicken thighs", "1 cup jasmine rice", "1 tsp ground cumin") — never vague amounts like "some" or "a bit of". Scale every quantity exactly to serve ${serveText} people.
 
@@ -244,7 +253,7 @@ For each recipe, calculate nutrition PER SERVING (i.e. for one of the ${serveTex
 3. Cross-check the result against the Atwater factors: calories should land within about 10% of (protein × 4) + (carbs × 4) + (fat × 9). Fiber is a subset of the carb grams already counted, not additional calories on top.
 4. These are careful, ingredient-grounded estimates, not lab-verified values — accuracy matters, but don't present false precision either.
 
-Respond ONLY with a single-line, compact JSON array — no line breaks or indentation inside the JSON itself, every extra whitespace character is response budget you need for 4 complete recipes. No other text. Exact shape (shown indented below only for readability — your actual response must be compact):
+Respond ONLY with a single-line, compact JSON array — no line breaks or indentation inside the JSON itself, every extra whitespace character is response budget you need for ${RECIPE_COUNT} complete recipes. No other text. Exact shape (shown indented below only for readability — your actual response must be compact):
 [
   {
     "title": "Recipe name",
@@ -265,12 +274,13 @@ Respond ONLY with a single-line, compact JSON array — no line breaks or indent
 If a recipe needs nothing extra, "missing" should be an empty array.
 "calories", "proteinG", "carbsG", "fatG", and "fiberG" are per serving and must be positive numbers, not strings or ranges.`;
 
-    // Raised from 4096: a large/verbose pantry (e.g. long descriptive item
-    // names from the photo-scan flow) plus the 5 macro fields per recipe
-    // pushed 4-recipe responses past the old ceiling often enough to be a
-    // real bug, not an edge case — confirmed via Render logs showing
-    // responses that were valid JSON as far as they went, then just stopped.
-    const data = await callClaude([{ role: 'user', content: prompt }], 8192);
+    // Raised from 4096 -> 8192 -> 12288: a large/verbose pantry (e.g. long
+    // descriptive item names from the photo-scan flow) plus the 5 macro
+    // fields per recipe pushed 4-recipe responses past the old ceiling often
+    // enough to be a real bug, not an edge case — confirmed via Render logs
+    // showing responses that were valid JSON as far as they went, then just
+    // stopped. Scaled up again in proportion to RECIPE_COUNT's 4->6 increase.
+    const data = await callClaude([{ role: 'user', content: prompt }], 12288);
     const textBlock = (data.content || []).find((b) => b.type === 'text');
     if (!textBlock) throw new Error('No text response from model');
     const truncated = data.stop_reason === 'max_tokens';
