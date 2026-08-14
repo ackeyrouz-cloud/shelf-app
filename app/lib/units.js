@@ -67,14 +67,24 @@ export function parseServingSize(raw) {
 // stable and gives real serving_size data when Open Food Facts has it.
 export async function fetchOffNamedServing(code) {
   if (!code) return null;
+  // Manual AbortController + setTimeout, not AbortSignal.timeout() — React
+  // Native's AbortSignal polyfill (the `abort-controller` npm package)
+  // doesn't implement that static method and throws synchronously if called,
+  // regardless of actual connectivity. See lookupOffBarcode in offLookup.js
+  // for the same fix, found via a real reproduction of this exact failure.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
   try {
     const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=serving_size`, {
-      signal: AbortSignal.timeout(6000),
+      signal: controller.signal,
     });
     if (!res.ok) return null;
     const data = await res.json();
     return parseServingSize(data?.product?.serving_size);
   } catch (e) {
+    console.warn('fetchOffNamedServing failed:', e.name, e.message);
     return null; // best-effort — a failed lookup just means no named-serving shortcut, not a broken screen
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

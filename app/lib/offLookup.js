@@ -66,18 +66,32 @@ function normalizeOffProduct(product, code) {
 // ("not in the database" vs. "something went wrong, try again") instead of
 // one generic failure state.
 export async function lookupOffBarcode(code) {
+  // React Native's global AbortSignal is polyfilled via the `abort-controller`
+  // npm package, which predates the AbortSignal.timeout() static method and
+  // doesn't implement it — calling it throws a synchronous TypeError on every
+  // request, unrelated to actual connectivity. Use the manual
+  // AbortController + setTimeout pattern already used elsewhere in this app
+  // (RecipesScreen, PantryContext) instead.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
   try {
     const res = await fetch(
       `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,brands,nutriments,serving_size,categories_tags,code`,
-      { signal: AbortSignal.timeout(8000) },
+      { signal: controller.signal },
     );
-    if (!res.ok) return { error: true };
+    if (!res.ok) {
+      console.warn('lookupOffBarcode: non-OK response', res.status);
+      return { error: true };
+    }
     const data = await res.json();
     if (data.status !== 1 || !data.product) return { notFound: true };
     const food = normalizeOffProduct(data.product, code);
     if (!food) return { notFound: true }; // recognized barcode, but no usable nutrition data
     return { food };
   } catch (e) {
+    console.warn('lookupOffBarcode failed:', e.name, e.message);
     return { error: true };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

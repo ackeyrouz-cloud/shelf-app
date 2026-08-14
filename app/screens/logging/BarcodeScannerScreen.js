@@ -201,7 +201,7 @@ export function BarcodeScannerScreen({ navigation }) {
 
 function makeStyles(colors) { return StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-  overlay: { flex: 1, justifyContent: 'space-between' },
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'space-between' },
   closeBtn: {
     position: 'absolute', top: 16, left: 16, zIndex: 1,
     width: 36, height: 36, alignItems: 'center', justifyContent: 'center',
