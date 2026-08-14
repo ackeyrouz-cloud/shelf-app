@@ -78,8 +78,13 @@ export function ProfileScreen({ navigation }) {
     <SafeAreaView style={common.safe}>
       <ScrollView contentContainerStyle={common.wrap}>
         <View style={common.header}>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <Text style={common.eyebrow}>PROFILE</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={dateNavStyles.headerRow}>
+              <View style={dateNavStyles.headerIcon}>
+                <Feather name="bar-chart-2" size={16} color={colors.fat} />
+              </View>
+              <Text style={common.eyebrow}>PROFILE</Text>
+            </View>
             <Pressable onPress={() => navigation.navigate('Settings')} hitSlop={12} accessibilityLabel="Settings">
               <Feather name="settings" size={22} color={colors.inkMuted} />
             </Pressable>
@@ -88,9 +93,9 @@ export function ProfileScreen({ navigation }) {
           <Text style={common.tagline}>What you've logged against your daily targets.</Text>
         </View>
 
-        <View style={dateNavStyles.row}>
+        <View style={dateNavStyles.pill}>
           <Pressable onPress={goPrevDay} hitSlop={12} style={dateNavStyles.chevron} accessibilityLabel="Previous day">
-            <Feather name="chevron-left" size={20} color={colors.ink} />
+            <Feather name="chevron-left" size={18} color={colors.fat} />
           </Pressable>
           <Text style={dateNavStyles.label}>{dateLabel(selectedDate)}</Text>
           <Pressable
@@ -100,7 +105,7 @@ export function ProfileScreen({ navigation }) {
             disabled={isToday}
             accessibilityLabel="Next day"
           >
-            <Feather name="chevron-right" size={20} color={colors.ink} />
+            <Feather name="chevron-right" size={18} color={colors.fat} />
           </Pressable>
         </View>
 
@@ -125,7 +130,15 @@ export function ProfileScreen({ navigation }) {
         )}
 
         <View style={{ marginTop: 24 }}>
-          <Text style={common.filterTitle}>{isToday ? "Today's meals" : `${dateLabel(selectedDate)}'s meals`}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={common.filterTitle}>{isToday ? "Today's meals" : `${dateLabel(selectedDate)}'s meals`}</Text>
+            {!logsLoading && logs.length > 0 && (
+              <View style={dateNavStyles.countPill}>
+                <Text style={dateNavStyles.countPillText}>{logs.length}</Text>
+                <Text style={dateNavStyles.countPillLabel}>LOGGED</Text>
+              </View>
+            )}
+          </View>
           <View style={{ marginTop: 8 }}>
             {logsLoading ? (
               <ActivityIndicator style={{ marginTop: 14 }} color={colors.primary} />
@@ -145,8 +158,23 @@ export function ProfileScreen({ navigation }) {
 }
 
 function makeDateNavStyles(colors) { return StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, marginTop: 4, marginBottom: 4 },
-  chevron: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerIcon: {
+    width: 30, height: 30, borderRadius: 10, borderCurve: 'continuous',
+    backgroundColor: `${colors.fat}22`, alignItems: 'center', justifyContent: 'center',
+  },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20,
+    alignSelf: 'center', backgroundColor: colors.surfaceRaised, borderRadius: 999,
+    paddingVertical: 6, paddingHorizontal: 10, marginTop: 4, marginBottom: 4,
+  },
+  chevron: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   label: { fontFamily: FONTS.displaySemiBold, fontSize: 15, color: colors.ink, minWidth: 90, textAlign: 'center' },
   emptyNote: { fontFamily: FONTS.bodyRegular, fontSize: 13, color: colors.inkMuted, marginTop: 6, lineHeight: 19 },
+  countPill: {
+    flexDirection: 'row', alignItems: 'baseline', gap: 4,
+    backgroundColor: `${colors.fat}22`, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 11,
+  },
+  countPillText: { fontFamily: FONTS.displaySemiBold, fontSize: 13, color: colors.fat },
+  countPillLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5, color: colors.fat },
 }); }
