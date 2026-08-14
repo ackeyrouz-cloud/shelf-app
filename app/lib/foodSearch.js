@@ -43,9 +43,10 @@ export async function searchFoods(query, { signal } = {}) {
 // instead rather than a quantity picker with nothing to scale from.
 export function foodFromRecentLog(log) {
   if (log.base_calories_per_100 == null) return null;
+  const source = log.custom_food_id ? 'custom' : log.off_code ? 'off' : log.usda_id ? 'usda' : 'voice';
   return {
     id: `log:${log.id}`,
-    source: log.custom_food_id ? 'custom' : (log.off_code ? 'off' : 'usda'),
+    source,
     name: log.recipe_title,
     brand: null,
     caloriesPer100: log.base_calories_per_100,
@@ -58,6 +59,7 @@ export function foodFromRecentLog(log) {
     offCode: log.off_code,
     usdaId: log.usda_id,
     customFoodId: log.custom_food_id,
+    isEstimated: !!log.is_estimated,
     defaultQuantity: log.quantity,
     defaultUnit: log.quantity_unit,
   };

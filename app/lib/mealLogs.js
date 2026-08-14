@@ -22,7 +22,7 @@ export function localDateString(date = new Date()) {
 // per-100 base to rescale from, so "log again" just repeats the same values.
 export async function logMeal({
   userId, recipeTitle, servings, macros, source = 'recipe',
-  base, quantity, quantityUnit, offCode, usdaId, customFoodId,
+  base, quantity, quantityUnit, offCode, usdaId, customFoodId, isEstimated = false,
 }) {
   return supabase
     .from('meal_logs')
@@ -47,6 +47,7 @@ export async function logMeal({
       off_code: offCode ?? null,
       usda_id: usdaId ?? null,
       custom_food_id: customFoodId ?? null,
+      is_estimated: isEstimated,
     })
     .select()
     .single();

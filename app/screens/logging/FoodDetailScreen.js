@@ -65,7 +65,8 @@ export function FoodDetailScreen({ navigation, route }) {
       recipeTitle: food.name,
       servings: 1,
       macros: { calories: scaled.calories, proteinG: scaled.proteinG, carbsG: scaled.carbsG, fatG: scaled.fatG, fiberG: scaled.fiberG },
-      source: 'search',
+      source: food.source === 'voice' ? 'voice' : 'search',
+      isEstimated: !!food.isEstimated,
       base: {
         caloriesPer100: food.caloriesPer100, proteinPer100: food.proteinPer100,
         carbsPer100: food.carbsPer100, fatPer100: food.fatPer100, fiberPer100: food.fiberPer100,
@@ -95,6 +96,15 @@ export function FoodDetailScreen({ navigation, route }) {
             <View style={{ flex: 1 }}>
               <Text style={[common.h1, { marginTop: 0, fontSize: 22 }]} numberOfLines={2}>{food.name}</Text>
               {!!food.brand && <Text style={common.tagline}>{food.brand}</Text>}
+              {!!food.isEstimated && (
+                <View style={{
+                  flexDirection: 'row', alignSelf: 'flex-start', alignItems: 'center', gap: 5,
+                  backgroundColor: `${colors.premium}22`, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10, marginTop: 8,
+                }}>
+                  <Feather name="zap" size={10} color={colors.premium} />
+                  <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 10, letterSpacing: 0.5, color: colors.premium }}>ESTIMATED</Text>
+                </View>
+              )}
             </View>
           </View>
 

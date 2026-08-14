@@ -531,6 +531,99 @@ app.get('/food-search', async (req, res) => {
   });
 });
 
+// POST /estimate-meal  { description, mustEstimate }
+// Single-pass nutrition estimate from a freeform typed/spoken description —
+// deliberately not a chat: at most one clarifying question is ever offered,
+// and only on the first pass (mustEstimate unset). The client resubmits
+// once with mustEstimate: true after any answer, and that second call is
+// instructed to produce a real estimate no matter what rather than asking
+// again — this endpoint has no memory of its own across calls, the client
+// is responsible for combining the original description with the
+// clarification into one string before resubmitting.
+app.post('/estimate-meal', async (req, res) => {
+  try {
+    const { description, mustEstimate } = req.body;
+    if (!description || !String(description).trim()) {
+      return res.status(400).json({ error: 'Missing description' });
+    }
+
+    const clarificationInstruction = mustEstimate
+      ? `You MUST produce a final estimate now — do not ask another question under any circumstances, even if some details are still unclear. Make the most reasonable standard assumption for anything unstated and proceed.`
+      : `Only ask a clarifying question if the description is genuinely too vague to produce ANY reasonable estimate at all (e.g. just "some pasta" with no dish, sauce, or portion context whatsoever). Most descriptions — even fairly short ones like "chicken caesar salad" or "two eggs and toast" — are specific enough to estimate: for anything unstated, make sensible standard assumptions (a standard restaurant-size portion, regular/typical preparation, no unusual substitutions) rather than asking. This is a single fast lookup, not a conversation — you get at most one question, ever, so don't ask unless an estimate would otherwise be a pure guess.`;
+
+    const prompt = `A user typed or spoke this description of something they ate: "${description}"
+
+${clarificationInstruction}
+
+If you can produce a reasonable estimate, calculate nutrition using a careful ingredient-by-ingredient method, the same way a nutritionist would:
+1. Infer the likely components of the described food/meal and their typical standard quantities for the portion size implied (or a standard restaurant/home-cooked serving if no size is stated).
+2. Estimate each component's calorie/protein/carb/fat/fiber contribution using real per-100g nutrition values, then sum them.
+3. Divide by the total estimated weight in grams to get per-100g values, so the result is a density (per 100g), not a single fixed total — this lets a user later adjust the serving size.
+4. Cross-check: calories should land within about 10% of (protein × 4) + (carbs × 4) + (fat × 9). Fiber is a subset of carb grams, not additional calories.
+5. Also report your best estimate of the total weight in grams for the portion as described — this is what the per-100g values get multiplied by to show the user their first result, before they can adjust it.
+6. These are careful, reasoned estimates, not lab-verified values — accuracy matters, but don't present false precision either.
+
+Respond ONLY with compact JSON, no other text, in exactly one of these two shapes:
+
+If you can estimate:
+{"needsClarification":false,"name":"Chicken Caesar Salad","caloriesPer100":140,"proteinPer100":9.5,"carbsPer100":6,"fatPer100":9,"fiberPer100":1.5,"estimatedGrams":350,"isBeverage":false}
+
+If (and only if) you genuinely cannot estimate at all:
+{"needsClarification":true,"question":"A single brief, specific question — under 15 words"}
+
+"name" should be a clean, title-cased short name for what was described. "isBeverage" should be true only for actual drinks. All numeric fields are required and must be positive numbers when needsClarification is false.`;
+
+    const data = await callClaude([{ role: 'user', content: prompt }], 500);
+    const textBlock = (data.content || []).find((b) => b.type === 'text');
+    if (!textBlock) throw new Error('No text response from model');
+
+    let parsed;
+    try {
+      parsed = extractJson(textBlock.text);
+    } catch (parseErr) {
+      console.warn('/estimate-meal: model response was not valid JSON. Raw response:', String(textBlock.text).slice(0, 500));
+      return res.status(502).json({ error: 'Could not produce an estimate' });
+    }
+
+    if (parsed.needsClarification && !mustEstimate) {
+      const question = typeof parsed.question === 'string' && parsed.question.trim()
+        ? parsed.question.trim()
+        : 'Could you describe that in a bit more detail?';
+      return res.json({ needsClarification: true, question });
+    }
+
+    const calories = Number(parsed.caloriesPer100);
+    const grams = Number(parsed.estimatedGrams);
+    if (!Number.isFinite(calories) || calories <= 0 || !Number.isFinite(grams) || grams <= 0) {
+      console.warn('/estimate-meal: model returned an incomplete estimate. Raw response:', String(textBlock.text).slice(0, 500));
+      return res.status(502).json({ error: 'Could not produce an estimate' });
+    }
+
+    res.json({
+      needsClarification: false,
+      estimate: {
+        name: typeof parsed.name === 'string' && parsed.name.trim() ? parsed.name.trim() : description.trim(),
+        caloriesPer100: calories,
+        proteinPer100: Number.isFinite(Number(parsed.proteinPer100)) ? Number(parsed.proteinPer100) : 0,
+        carbsPer100: Number.isFinite(Number(parsed.carbsPer100)) ? Number(parsed.carbsPer100) : 0,
+        fatPer100: Number.isFinite(Number(parsed.fatPer100)) ? Number(parsed.fatPer100) : 0,
+        fiberPer100: Number.isFinite(Number(parsed.fiberPer100)) ? Number(parsed.fiberPer100) : null,
+        estimatedGrams: grams,
+        isBeverage: !!parsed.isBeverage,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    if (err.name === 'TimeoutError') {
+      return res.status(504).json({ error: 'Request timed out', timeout: true });
+    }
+    if (err.status === 529 || err.status === 503) {
+      return res.status(503).json({ error: 'Service overloaded', overloaded: true });
+    }
+    res.status(500).json({ error: 'Failed to estimate nutrition' });
+  }
+});
+
 // POST /delete-account  Authorization: Bearer <supabase access token>
 // Deleting the auth.users row cascades to profiles, pantry_items, and
 // meal_logs automatically — all three have `on delete cascade` foreign keys
