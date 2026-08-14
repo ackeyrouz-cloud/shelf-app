@@ -8,21 +8,29 @@ const OnboardingContext = createContext(undefined);
 
 // Scoped to the onboarding flow only (mounted by OnboardingNavigator, torn
 // down once the profile is saved) — this is deliberately not a global
-// context like Auth/Profile/Pantry.
+// context like Auth/Profile/Pantry. Doubles as the "edit targets" flow when
+// entered from Settings with an existing profile already loaded: the same
+// screens, prefilled with real values instead of defaults, ending at the
+// same override-capable review screen.
 export function OnboardingProvider({ children }) {
   const { userId } = useAuth();
-  const { setProfile } = useProfile();
+  const { profile, setProfile } = useProfile();
+
+  // True whenever there's a complete existing profile to edit (i.e. this
+  // mount came from Settings' "Recalculate Targets", not first-time signup).
+  const isEditingExisting = profile?.weight != null;
 
   // Wheel-picker fields get sane defaults so the highlighted value and the
   // Continue button always agree — there's no "nothing selected" state for
-  // a wheel the way there is for an unselected chip.
-  const [sex, setSex] = useState('');
-  const [age, setAge] = useState(30);
-  const [height, setHeight] = useState(170);
-  const [weight, setWeight] = useState(70);
-  const [activityLevel, setActivityLevel] = useState('');
-  const [targetWeight, setTargetWeight] = useState(70);
-  const [targetTimeframeWeeks, setTargetTimeframeWeeks] = useState(12);
+  // a wheel the way there is for an unselected chip. When editing an
+  // existing profile, seed from its real values instead.
+  const [sex, setSex] = useState(() => profile?.sex ?? '');
+  const [age, setAge] = useState(() => profile?.age ?? 30);
+  const [height, setHeight] = useState(() => profile?.height ?? 170);
+  const [weight, setWeight] = useState(() => profile?.weight ?? 70);
+  const [activityLevel, setActivityLevel] = useState(() => profile?.activity_level ?? '');
+  const [targetWeight, setTargetWeight] = useState(() => profile?.target_weight ?? 70);
+  const [targetTimeframeWeeks, setTargetTimeframeWeeks] = useState(() => profile?.target_timeframe_weeks ?? 12);
 
   // Editable target overrides — undefined until the review screen seeds them
   // from the calculated baseline, matching the original "adjust before saving" behavior.
@@ -51,6 +59,10 @@ export function OnboardingProvider({ children }) {
     setFiberInput(String(calculated.fiberG));
   };
 
+  // Returns true on success, false on failure — callers only need this to
+  // decide whether to navigate afterward (the edit-from-Settings case);
+  // first-time onboarding ignores the return value since RootNavigator's
+  // gate transitions automatically once profile updates.
   const save = async () => {
     const finalCalories = parseFloat(caloriesInput);
     const finalProtein = parseFloat(proteinInput);
@@ -59,7 +71,7 @@ export function OnboardingProvider({ children }) {
     const finalFiber = parseFloat(fiberInput);
     if ([finalCalories, finalProtein, finalCarbs, finalFat, finalFiber].some(n => !(n >= 0))) {
       setSaveError('Enter valid numbers for all targets.');
-      return;
+      return false;
     }
     setSaveError('');
     setSaving(true);
@@ -86,12 +98,15 @@ export function OnboardingProvider({ children }) {
     if (saveErr) {
       setSaveError("Couldn't save your profile. Check your connection and try again.");
       setSaving(false);
-      return;
+      return false;
     }
     setProfile(data);
+    setSaving(false);
+    return true;
   };
 
   const value = {
+    isEditingExisting,
     sex, setSex,
     age, setAge,
     height, setHeight,

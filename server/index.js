@@ -7,6 +7,7 @@
 
 const express = require('express');
 const cors = require('cors');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(cors());
@@ -14,6 +15,29 @@ app.use(express.json({ limit: '10mb' }));
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-5';
+
+// Same project the app itself talks to (app/lib/supabase.js) — URL and anon
+// key are not secret, they're already embedded in the client bundle. The
+// service role key is the actual secret: it bypasses RLS entirely and can
+// delete any user, so it only ever lives here as an env var, never in the app.
+const SUPABASE_URL = 'https://ltojyhjzsgqcoswzpsju.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_C8KuPFP_lTrWZUBd-daSsQ_oK4oF1b_';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Verifies a caller-supplied access token and reports the real user id it
+// belongs to — never trust a client-supplied user id directly.
+const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Admin-privileged client, only used for account deletion. Null (rather than
+// throwing at startup) when the env var isn't set, so the rest of the server
+// keeps working and /delete-account fails with a clear message instead of
+// crashing the whole process over a feature some deploys may not have configured yet.
+const supabaseAdmin = SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  : null;
+
+if (!SUPABASE_SERVICE_ROLE_KEY) {
+  console.warn('WARNING: SUPABASE_SERVICE_ROLE_KEY is not set. /delete-account will fail.');
+}
 // Node/undici's default fetch timeout is 5 minutes with no feedback to the user in that
 // window — cap it far below that so a stalled request fails fast with a clear message
 // instead of leaving the app looking hung. 45s observed as a safe margin: even a plain,
@@ -297,6 +321,37 @@ If a recipe needs nothing extra, "missing" should be an empty array.
       return res.status(503).json({ error: 'Service overloaded', overloaded: true });
     }
     res.status(500).json({ error: 'Failed to generate recipes' });
+  }
+});
+
+// POST /delete-account  Authorization: Bearer <supabase access token>
+// Deleting the auth.users row cascades to profiles, pantry_items, and
+// meal_logs automatically — all three have `on delete cascade` foreign keys
+// to auth.users(id), so nothing else needs deleting explicitly here.
+app.post('/delete-account', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'Missing access token' });
+
+    const { data: { user }, error: userErr } = await supabaseAuth.auth.getUser(token);
+    if (userErr || !user) return res.status(401).json({ error: 'Invalid or expired session' });
+
+    if (!supabaseAdmin) {
+      console.error('/delete-account: SUPABASE_SERVICE_ROLE_KEY is not configured');
+      return res.status(500).json({ error: 'Account deletion is not configured on the server' });
+    }
+
+    const { error: deleteErr } = await supabaseAdmin.auth.admin.deleteUser(user.id);
+    if (deleteErr) {
+      console.error('/delete-account: deleteUser failed', deleteErr);
+      return res.status(500).json({ error: 'Failed to delete account' });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to delete account' });
   }
 });
 

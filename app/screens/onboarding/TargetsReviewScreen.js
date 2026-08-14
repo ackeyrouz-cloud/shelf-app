@@ -14,6 +14,7 @@ import { useOnboarding } from '../../context/OnboardingContext';
 
 export function TargetsReviewScreen({ navigation }) {
   const {
+    isEditingExisting,
     calculated,
     caloriesInput, setCaloriesInput,
     proteinInput, setProteinInput,
@@ -27,6 +28,16 @@ export function TargetsReviewScreen({ navigation }) {
   const protein = parseFloat(proteinInput) || 0;
   const carbs = parseFloat(carbsInput) || 0;
   const fat = parseFloat(fatInput) || 0;
+
+  const handleSave = async () => {
+    const ok = await save();
+    // Editing from Settings: pop the modal back to wherever it was opened
+    // from. First-time onboarding: nothing to do, RootNavigator's own gate
+    // swaps away from Onboarding automatically once the profile updates.
+    if (ok && isEditingExisting) {
+      navigation.getParent()?.goBack();
+    }
+  };
 
   return (
     <SafeAreaView style={common.safe}>
@@ -74,7 +85,7 @@ export function TargetsReviewScreen({ navigation }) {
             </FilterBlock>
           </View>
 
-          <PrimaryButton label={saving ? 'Saving…' : 'Save and continue'} onPress={save} disabled={saving} />
+          <PrimaryButton label={saving ? 'Saving…' : isEditingExisting ? 'Save targets' : 'Save and continue'} onPress={handleSave} disabled={saving} />
 
           {saving && <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />}
           {!!saveError && (

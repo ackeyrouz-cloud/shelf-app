@@ -5,11 +5,13 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../lib/supabase';
+import { passwordResetRedirectUrl } from '../lib/deepLinks';
 import { COLORS } from '../theme/colors';
 import { common } from '../theme/common';
 import { FilterBlock } from '../components/FilterBlock';
 import { PrimaryButton } from '../components/PrimaryButton';
 
+// mode: 'signin' | 'signup' | 'forgot'
 export function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,7 +20,34 @@ export function AuthScreen() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
+  const switchMode = (next) => {
+    Haptics.selectionAsync();
+    setMode(next);
+    setError('');
+    setMessage('');
+  };
+
   const submit = async () => {
+    if (mode === 'forgot') {
+      if (!email.trim()) {
+        setError('Enter your email.');
+        return;
+      }
+      setError('');
+      setMessage('');
+      setLoading(true);
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: passwordResetRedirectUrl(),
+      });
+      setLoading(false);
+      if (resetError) {
+        setError(resetError.message);
+      } else {
+        setMessage("If that email has an account, we've sent a link to reset your password.");
+      }
+      return;
+    }
+
     if (!email.trim() || !password) {
       setError('Enter your email and password.');
       return;
@@ -47,16 +76,25 @@ export function AuthScreen() {
     setLoading(false);
   };
 
+  const titles = {
+    signin: ['Welcome back', 'Sign in to pick up where you left off.'],
+    signup: ['Create your account', 'Create an account to save your pantry and preferences.'],
+    forgot: ['Reset your password', "Enter your email and we'll send you a link to reset it."],
+  };
+  const [title, tagline] = titles[mode];
+
+  const ctaLabel = loading
+    ? 'Please wait…'
+    : mode === 'signup' ? 'Create account' : mode === 'forgot' ? 'Send reset link' : 'Sign in';
+
   return (
     <SafeAreaView style={common.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={[common.wrap, { flexGrow: 1, justifyContent: 'center' }]} keyboardShouldPersistTaps="handled">
           <View style={common.header}>
             <Text style={common.eyebrow}>SHELF</Text>
-            <Text style={common.h1}>{mode === 'signup' ? 'Create your account' : 'Welcome back'}</Text>
-            <Text style={common.tagline}>
-              {mode === 'signup' ? 'Create an account to save your pantry and preferences.' : 'Sign in to pick up where you left off.'}
-            </Text>
+            <Text style={common.h1}>{title}</Text>
+            <Text style={common.tagline}>{tagline}</Text>
           </View>
 
           <View style={common.card}>
@@ -73,25 +111,29 @@ export function AuthScreen() {
                 accessibilityLabel="Email address"
               />
             </FilterBlock>
-            <FilterBlock title="Password" style={{ marginTop: 16 }}>
-              <TextInput
-                style={common.input}
-                placeholder="At least 6 characters"
-                placeholderTextColor={COLORS.inkMuted}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                accessibilityLabel="Password"
-              />
-            </FilterBlock>
+            {mode !== 'forgot' && (
+              <FilterBlock title="Password" style={{ marginTop: 16 }}>
+                <TextInput
+                  style={common.input}
+                  placeholder="At least 6 characters"
+                  placeholderTextColor={COLORS.inkMuted}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  accessibilityLabel="Password"
+                />
+              </FilterBlock>
+            )}
           </View>
 
-          <PrimaryButton
-            label={loading ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Sign in'}
-            onPress={submit}
-            disabled={loading}
-          />
+          {mode === 'signin' && (
+            <Pressable style={{ marginTop: 12, alignItems: 'flex-end' }} onPress={() => switchMode('forgot')}>
+              <Text style={common.expandHint}>Forgot password?</Text>
+            </Pressable>
+          )}
+
+          <PrimaryButton label={ctaLabel} onPress={submit} disabled={loading} />
 
           {loading && <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />}
           {!!error && (
@@ -103,10 +145,12 @@ export function AuthScreen() {
 
           <Pressable
             style={{ marginTop: 20, alignItems: 'center' }}
-            onPress={() => { Haptics.selectionAsync(); setMode(mode === 'signup' ? 'signin' : 'signup'); setError(''); setMessage(''); }}
+            onPress={() => switchMode(mode === 'signup' ? 'signin' : mode === 'forgot' ? 'signin' : 'signup')}
           >
             <Text style={common.expandHint}>
-              {mode === 'signup' ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
+              {mode === 'signup' ? 'Already have an account? Sign in'
+                : mode === 'forgot' ? '‹ Back to sign in'
+                : "Don't have an account? Create one"}
             </Text>
           </Pressable>
         </ScrollView>

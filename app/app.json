@@ -3,6 +3,7 @@
     "name": "Shelf",
     "slug": "shelf-meal-planner",
     "version": "1.0.0",
+    "scheme": "shelf",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",

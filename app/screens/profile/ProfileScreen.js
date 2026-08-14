@@ -9,7 +9,6 @@ import { common } from '../../theme/common';
 import { MacroRing } from '../../components/MacroRing';
 import { NutrientProgressBar } from '../../components/NutrientProgressBar';
 import { MealLogEntry } from '../../components/MealLogEntry';
-import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 import { getMealLogsForDate, localDateString } from '../../lib/mealLogs';
 
@@ -24,8 +23,7 @@ function dateLabel(date) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-export function ProfileScreen() {
-  const { signOut } = useAuth();
+export function ProfileScreen({ navigation }) {
   const { profile } = useProfile();
 
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -78,7 +76,12 @@ export function ProfileScreen() {
     <SafeAreaView style={common.safe}>
       <ScrollView contentContainerStyle={common.wrap}>
         <View style={common.header}>
-          <Text style={common.eyebrow}>PROFILE</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <Text style={common.eyebrow}>PROFILE</Text>
+            <Pressable onPress={() => navigation.navigate('Settings')} hitSlop={12} accessibilityLabel="Settings">
+              <Feather name="settings" size={22} color={COLORS.inkMuted} />
+            </Pressable>
+          </View>
           <Text style={common.h1}>Today's progress</Text>
           <Text style={common.tagline}>What you've logged against your daily targets.</Text>
         </View>
@@ -134,10 +137,6 @@ export function ProfileScreen() {
             )}
           </View>
         </View>
-
-        <Pressable onPress={() => { Haptics.selectionAsync(); signOut(); }} style={{ marginTop: 28, alignItems: 'center' }}>
-          <Text style={common.expandHint}>Sign out</Text>
-        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
