@@ -25,7 +25,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1C1917"
+        "backgroundColor": "#0B0F17"
       },
       "package": "com.yourname.shelf",
       "permissions": [
