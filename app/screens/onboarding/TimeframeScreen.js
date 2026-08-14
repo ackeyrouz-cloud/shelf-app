@@ -1,11 +1,12 @@
 import React from 'react';
 import { QuestionScreenLayout } from '../../components/QuestionScreenLayout';
 import { NumberWheelPicker } from '../../components/NumberWheelPicker';
-import { COLORS } from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
 import { useOnboarding } from '../../context/OnboardingContext';
 
 export function TimeframeScreen({ navigation }) {
   const { targetTimeframeWeeks, setTargetTimeframeWeeks, seedInputsFromCalculated } = useOnboarding();
+  const { colors } = useTheme();
 
   return (
     <QuestionScreenLayout
@@ -14,7 +15,7 @@ export function TimeframeScreen({ navigation }) {
       title="Over what timeframe?"
       subtitle="How many weeks to reach your target weight."
       icon="clock"
-      iconColor={COLORS.success}
+      iconColor={colors.success}
       onBack={() => navigation.goBack()}
       onContinue={() => {
         seedInputsFromCalculated();
@@ -28,7 +29,7 @@ export function TimeframeScreen({ navigation }) {
         max={52}
         step={1}
         unit="weeks"
-        accentColor={COLORS.success}
+        accentColor={colors.success}
       />
     </QuestionScreenLayout>
   );

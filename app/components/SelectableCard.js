@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -6,8 +6,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { COLORS } from '../theme/colors';
 import { FONTS } from '../theme/fonts';
+import { useTheme } from '../context/ThemeContext';
 
 const ICON_SETS = { Feather, MaterialCommunityIcons };
 
@@ -17,8 +17,11 @@ const ICON_SETS = { Feather, MaterialCommunityIcons };
 // so selection never depends on color alone. Press feedback runs on the UI
 // thread via GestureDetector rather than Pressable's JS-thread callback.
 export function SelectableCard({
-  icon, iconFamily = 'Feather', label, description, selected, onPress, accentColor = COLORS.primary,
+  icon, iconFamily = 'Feather', label, description, selected, onPress, accentColor,
 }) {
+  const { colors } = useTheme();
+  const resolvedAccentColor = accentColor || colors.primary;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const IconComponent = ICON_SETS[iconFamily];
   const pressed = useSharedValue(0);
   const selectedProgress = useSharedValue(selected ? 1 : 0);
@@ -37,8 +40,8 @@ export function SelectableCard({
 
   const cardStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 1 - pressed.get() * 0.02 }],
-    backgroundColor: interpolateColor(selectedProgress.value, [0, 1], [COLORS.surface, accentColor]),
-    borderColor: interpolateColor(selectedProgress.value, [0, 1], ['rgba(238,241,246,0.10)', accentColor]),
+    backgroundColor: interpolateColor(selectedProgress.value, [0, 1], [colors.surface, resolvedAccentColor]),
+    borderColor: interpolateColor(selectedProgress.value, [0, 1], [colors.hairline, resolvedAccentColor]),
   }));
 
   return (
@@ -49,18 +52,18 @@ export function SelectableCard({
         accessibilityState={{ selected }}
         accessibilityLabel={description ? `${label}. ${description}` : label}
       >
-        <View style={[styles.iconBadge, { backgroundColor: selected ? 'rgba(11,15,23,0.16)' : COLORS.surfaceRaised }]}>
-          <IconComponent name={icon} size={24} color={selected ? COLORS.onFill : accentColor} />
+        <View style={[styles.iconBadge, { backgroundColor: selected ? 'rgba(11,15,23,0.16)' : colors.surfaceRaised }]}>
+          <IconComponent name={icon} size={24} color={selected ? colors.onFill : resolvedAccentColor} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.label, { color: selected ? COLORS.onFill : COLORS.ink }]}>{label}</Text>
+          <Text style={[styles.label, { color: selected ? colors.onFill : colors.ink }]}>{label}</Text>
           {!!description && (
-            <Text style={[styles.description, { color: selected ? 'rgba(11,15,23,0.7)' : COLORS.inkMuted }]}>{description}</Text>
+            <Text style={[styles.description, { color: selected ? 'rgba(11,15,23,0.7)' : colors.inkMuted }]}>{description}</Text>
           )}
         </View>
         {selected && (
           <View style={styles.checkBadge}>
-            <Feather name="check" size={14} color={accentColor} />
+            <Feather name="check" size={14} color={resolvedAccentColor} />
           </View>
         )}
       </Animated.View>
@@ -68,7 +71,7 @@ export function SelectableCard({
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) { return StyleSheet.create({
   card: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     minHeight: 72, borderRadius: 18, borderCurve: 'continuous',
@@ -81,7 +84,7 @@ const styles = StyleSheet.create({
   label: { fontFamily: FONTS.displaySemiBold, fontSize: 16 },
   description: { fontFamily: FONTS.bodyRegular, fontSize: 12.5, marginTop: 3, lineHeight: 17 },
   checkBadge: {
-    width: 24, height: 24, borderRadius: 12, backgroundColor: COLORS.onFill,
+    width: 24, height: 24, borderRadius: 12, backgroundColor: colors.onFill,
     alignItems: 'center', justifyContent: 'center',
   },
-});
+}); }

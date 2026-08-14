@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { COLORS } from '../theme/colors';
 import { FONTS } from '../theme/fonts';
+import { useTheme } from '../context/ThemeContext';
 import { ShelfScreen } from '../screens/shelf/ShelfScreen';
 import { RecipesScreen } from '../screens/recipes/RecipesScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
@@ -15,14 +15,19 @@ const Tab = createBottomTabNavigator();
 // Each tab gets its own color identity (Liftoff-style) rather than one
 // accent for every active state, and swaps to a filled glyph when active
 // (Ionicons ships outline/filled pairs) so the state change isn't hue alone.
-const TAB_CONFIG = {
-  Shelf: { icon: 'archive', iconOutline: 'archive-outline', color: COLORS.primary },
-  Recipes: { icon: 'restaurant', iconOutline: 'restaurant-outline', color: COLORS.success },
-  Profile: { icon: 'person-circle', iconOutline: 'person-circle-outline', color: COLORS.fat },
-};
+function tabConfig(colors) {
+  return {
+    Shelf: { icon: 'archive', iconOutline: 'archive-outline', color: colors.primary },
+    Recipes: { icon: 'restaurant', iconOutline: 'restaurant-outline', color: colors.success },
+    Profile: { icon: 'person-circle', iconOutline: 'person-circle-outline', color: colors.fat },
+  };
+}
 
 function CustomTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const TAB_CONFIG = tabConfig(colors);
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
@@ -52,7 +57,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
             <Ionicons
               name={focused ? config.icon : config.iconOutline}
               size={24}
-              color={focused ? config.color : COLORS.inkMuted}
+              color={focused ? config.color : colors.inkMuted}
             />
             <Text style={[styles.label, focused && { color: config.color, fontFamily: FONTS.bodyBold }]}>{label}</Text>
           </Pressable>
@@ -75,12 +80,12 @@ export function MainTabs() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) { return StyleSheet.create({
   bar: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: COLORS.hairline,
+    borderTopColor: colors.hairline,
     paddingTop: 10,
   },
   tab: {
@@ -93,6 +98,6 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: FONTS.bodySemiBold,
     fontSize: 11,
-    color: COLORS.inkMuted,
+    color: colors.inkMuted,
   },
-});
+}); }

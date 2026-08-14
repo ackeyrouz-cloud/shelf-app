@@ -5,12 +5,13 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '../../lib/supabase';
-import { COLORS } from '../../theme/colors';
-import { common } from '../../theme/common';
+import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 import { FilterBlock } from '../../components/FilterBlock';
 import { PrimaryButton } from '../../components/PrimaryButton';
 
 export function ChangePasswordScreen({ navigation }) {
+  const { colors } = useTheme();
+  const common = useCommonStyles();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [saving, setSaving] = useState(false);
@@ -43,14 +44,14 @@ export function ChangePasswordScreen({ navigation }) {
         <ScrollView contentContainerStyle={common.wrap} keyboardShouldPersistTaps="handled">
           <View style={[common.header, { flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
             <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityLabel="Back">
-              <Feather name="chevron-left" size={24} color={COLORS.ink} />
+              <Feather name="chevron-left" size={24} color={colors.ink} />
             </Pressable>
             <Text style={[common.h1, { marginTop: 0 }]}>Change Password</Text>
           </View>
 
           {done ? (
             <View style={[common.card, { marginTop: 20, alignItems: 'center', paddingVertical: 28 }]}>
-              <Feather name="check-circle" size={32} color={COLORS.success} />
+              <Feather name="check-circle" size={32} color={colors.success} />
               <Text style={[common.tagline, { marginTop: 12, textAlign: 'center' }]}>Your password has been updated.</Text>
               <PrimaryButton label="Done" onPress={() => navigation.goBack()} style={{ marginTop: 20, alignSelf: 'stretch' }} />
             </View>
@@ -61,7 +62,7 @@ export function ChangePasswordScreen({ navigation }) {
                   <TextInput
                     style={common.input}
                     placeholder="At least 6 characters"
-                    placeholderTextColor={COLORS.inkMuted}
+                    placeholderTextColor={colors.inkMuted}
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry
@@ -73,7 +74,7 @@ export function ChangePasswordScreen({ navigation }) {
                   <TextInput
                     style={common.input}
                     placeholder="Re-enter password"
-                    placeholderTextColor={COLORS.inkMuted}
+                    placeholderTextColor={colors.inkMuted}
                     value={confirm}
                     onChangeText={setConfirm}
                     secureTextEntry
@@ -85,7 +86,7 @@ export function ChangePasswordScreen({ navigation }) {
 
               <PrimaryButton label={saving ? 'Saving…' : 'Update password'} onPress={submit} disabled={saving} />
 
-              {saving && <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />}
+              {saving && <ActivityIndicator style={{ marginTop: 14 }} color={colors.primary} />}
               {!!error && (
                 <View style={common.errorBox}><Text style={common.errorText}>{error}</Text></View>
               )}

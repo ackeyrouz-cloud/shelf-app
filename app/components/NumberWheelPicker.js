@@ -5,14 +5,14 @@ import Animated, {
   interpolate, Extrapolation,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { COLORS } from '../theme/colors';
 import { FONTS } from '../theme/fonts';
+import { useTheme } from '../context/ThemeContext';
 
 const ITEM_HEIGHT = 46;
 const VISIBLE_COUNT = 5;
 const CONTAINER_HEIGHT = ITEM_HEIGHT * VISIBLE_COUNT;
 
-function WheelItem({ label, index, scrollY }) {
+function WheelItem({ label, index, scrollY, styles }) {
   const style = useAnimatedStyle(() => {
     const distance = (scrollY.value - index * ITEM_HEIGHT) / ITEM_HEIGHT;
     return {
@@ -32,7 +32,10 @@ function WheelItem({ label, index, scrollY }) {
 // identity instead of inheriting OS chrome. Exposes an "adjustable"
 // accessibility role with increment/decrement actions so it's still operable
 // without a precise drag gesture (VoiceOver/TalkBack, switch control).
-export function NumberWheelPicker({ value, onChange, min, max, step = 1, unit, formatValue, accentColor = COLORS.primary }) {
+export function NumberWheelPicker({ value, onChange, min, max, step = 1, unit, formatValue, accentColor }) {
+  const { colors } = useTheme();
+  const resolvedAccentColor = accentColor || colors.primary;
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const items = useMemo(() => {
     const out = [];
     for (let v = min; v <= max + 1e-6; v = Math.round((v + step) * 1000) / 1000) out.push(Math.round(v * 1000) / 1000);
@@ -94,12 +97,12 @@ export function NumberWheelPicker({ value, onChange, min, max, step = 1, unit, f
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
       onAccessibilityAction={(e) => step_(e.nativeEvent.actionName === 'increment' ? 1 : -1)}
     >
-      <View pointerEvents="none" style={[styles.selectionWindow, { borderColor: accentColor, backgroundColor: `${accentColor}14` }]} />
+      <View pointerEvents="none" style={[styles.selectionWindow, { borderColor: resolvedAccentColor, backgroundColor: `${resolvedAccentColor}14` }]} />
       <Animated.FlatList
         ref={listRef}
         data={items}
         keyExtractor={(item) => String(item)}
-        renderItem={({ item, index }) => <WheelItem label={display(item)} index={index} scrollY={scrollY} />}
+        renderItem={({ item, index }) => <WheelItem label={display(item)} index={index} scrollY={scrollY} styles={styles} />}
         showsVerticalScrollIndicator={false}
         snapToInterval={ITEM_HEIGHT}
         decelerationRate="fast"
@@ -116,7 +119,7 @@ export function NumberWheelPicker({ value, onChange, min, max, step = 1, unit, f
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) { return StyleSheet.create({
   wrap: { height: CONTAINER_HEIGHT, alignItems: 'center', justifyContent: 'center' },
   selectionWindow: {
     position: 'absolute',
@@ -128,9 +131,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1.5,
   },
   item: { height: ITEM_HEIGHT, alignItems: 'center', justifyContent: 'center' },
-  itemText: { fontFamily: FONTS.displayExtraBold, fontSize: 26, color: COLORS.ink },
+  itemText: { fontFamily: FONTS.displayExtraBold, fontSize: 26, color: colors.ink },
   unit: {
     position: 'absolute', right: 28, top: '50%', marginTop: -8,
-    fontFamily: FONTS.bodySemiBold, fontSize: 12, color: COLORS.inkMuted,
+    fontFamily: FONTS.bodySemiBold, fontSize: 12, color: colors.inkMuted,
   },
-});
+}); }

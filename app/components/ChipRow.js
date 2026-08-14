@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { common } from '../theme/common';
+import { useCommonStyles } from '../context/ThemeContext';
 
 export function ChipRow({ options, value, onChange }) {
+  const common = useCommonStyles();
   return (
     <View style={common.chipRow}>
       {options.map(opt => {
@@ -25,6 +26,7 @@ export function ChipRow({ options, value, onChange }) {
 }
 
 export function MultiChipRow({ options, values, onToggle }) {
+  const common = useCommonStyles();
   return (
     <View style={common.chipRow}>
       {options.map(opt => {

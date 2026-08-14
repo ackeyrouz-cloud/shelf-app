@@ -1,11 +1,12 @@
 import React from 'react';
 import { QuestionScreenLayout } from '../../components/QuestionScreenLayout';
 import { NumberWheelPicker } from '../../components/NumberWheelPicker';
-import { COLORS } from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
 import { useOnboarding } from '../../context/OnboardingContext';
 
 export function WeightScreen({ navigation }) {
   const { weight, setWeight } = useOnboarding();
+  const { colors } = useTheme();
 
   return (
     <QuestionScreenLayout
@@ -14,7 +15,7 @@ export function WeightScreen({ navigation }) {
       title="What's your current weight?"
       icon="scale-bathroom"
       iconFamily="MaterialCommunityIcons"
-      iconColor={COLORS.protein}
+      iconColor={colors.protein}
       onBack={() => navigation.goBack()}
       onContinue={() => navigation.navigate('Activity')}
     >
@@ -26,7 +27,7 @@ export function WeightScreen({ navigation }) {
         step={0.5}
         unit="kg"
         formatValue={(v) => v.toFixed(1)}
-        accentColor={COLORS.protein}
+        accentColor={colors.protein}
       />
     </QuestionScreenLayout>
   );

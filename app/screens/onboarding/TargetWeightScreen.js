@@ -1,11 +1,12 @@
 import React from 'react';
 import { QuestionScreenLayout } from '../../components/QuestionScreenLayout';
 import { NumberWheelPicker } from '../../components/NumberWheelPicker';
-import { COLORS } from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
 import { useOnboarding } from '../../context/OnboardingContext';
 
 export function TargetWeightScreen({ navigation }) {
   const { targetWeight, setTargetWeight } = useOnboarding();
+  const { colors } = useTheme();
 
   return (
     <QuestionScreenLayout
@@ -14,7 +15,7 @@ export function TargetWeightScreen({ navigation }) {
       title="What's your target weight?"
       subtitle="Set it equal to your current weight if you're aiming to maintain."
       icon="target"
-      iconColor={COLORS.premium}
+      iconColor={colors.premium}
       onBack={() => navigation.goBack()}
       onContinue={() => navigation.navigate('Timeframe')}
     >
@@ -26,7 +27,7 @@ export function TargetWeightScreen({ navigation }) {
         step={0.5}
         unit="kg"
         formatValue={(v) => v.toFixed(1)}
-        accentColor={COLORS.premium}
+        accentColor={colors.premium}
       />
     </QuestionScreenLayout>
   );

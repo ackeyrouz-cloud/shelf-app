@@ -3,9 +3,8 @@ import { SafeAreaView, ScrollView, View, Text, Pressable, ActivityIndicator, Sty
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
-import { COLORS } from '../../theme/colors';
 import { FONTS } from '../../theme/fonts';
-import { common } from '../../theme/common';
+import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 import { MacroRing } from '../../components/MacroRing';
 import { NutrientProgressBar } from '../../components/NutrientProgressBar';
 import { MealLogEntry } from '../../components/MealLogEntry';
@@ -25,6 +24,9 @@ function dateLabel(date) {
 
 export function ProfileScreen({ navigation }) {
   const { profile } = useProfile();
+  const { colors } = useTheme();
+  const common = useCommonStyles();
+  const dateNavStyles = useMemo(() => makeDateNavStyles(colors), [colors]);
 
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [logs, setLogs] = useState([]);
@@ -79,7 +81,7 @@ export function ProfileScreen({ navigation }) {
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
             <Text style={common.eyebrow}>PROFILE</Text>
             <Pressable onPress={() => navigation.navigate('Settings')} hitSlop={12} accessibilityLabel="Settings">
-              <Feather name="settings" size={22} color={COLORS.inkMuted} />
+              <Feather name="settings" size={22} color={colors.inkMuted} />
             </Pressable>
           </View>
           <Text style={common.h1}>Today's progress</Text>
@@ -88,7 +90,7 @@ export function ProfileScreen({ navigation }) {
 
         <View style={dateNavStyles.row}>
           <Pressable onPress={goPrevDay} hitSlop={12} style={dateNavStyles.chevron} accessibilityLabel="Previous day">
-            <Feather name="chevron-left" size={20} color={COLORS.ink} />
+            <Feather name="chevron-left" size={20} color={colors.ink} />
           </Pressable>
           <Text style={dateNavStyles.label}>{dateLabel(selectedDate)}</Text>
           <Pressable
@@ -98,7 +100,7 @@ export function ProfileScreen({ navigation }) {
             disabled={isToday}
             accessibilityLabel="Next day"
           >
-            <Feather name="chevron-right" size={20} color={COLORS.ink} />
+            <Feather name="chevron-right" size={20} color={colors.ink} />
           </Pressable>
         </View>
 
@@ -111,11 +113,11 @@ export function ProfileScreen({ navigation }) {
             <View style={[common.card, { marginTop: 14 }]}>
               <Text style={common.filterTitle}>Macros</Text>
               <View style={{ marginTop: 8 }}>
-                <NutrientProgressBar label="Protein" consumed={totals.protein} target={profile.target_protein_g} color={COLORS.protein} />
-                <NutrientProgressBar label="Carbs" consumed={totals.carbs} target={profile.target_carbs_g} color={COLORS.carbs} />
-                <NutrientProgressBar label="Fat" consumed={totals.fat} target={profile.target_fat_g} color={COLORS.fat} />
+                <NutrientProgressBar label="Protein" consumed={totals.protein} target={profile.target_protein_g} color={colors.protein} />
+                <NutrientProgressBar label="Carbs" consumed={totals.carbs} target={profile.target_carbs_g} color={colors.carbs} />
+                <NutrientProgressBar label="Fat" consumed={totals.fat} target={profile.target_fat_g} color={colors.fat} />
                 {profile.target_fiber_g != null && (
-                  <NutrientProgressBar label="Fiber" consumed={totals.fiber} target={profile.target_fiber_g} color={COLORS.fiber} />
+                  <NutrientProgressBar label="Fiber" consumed={totals.fiber} target={profile.target_fiber_g} color={colors.fiber} />
                 )}
               </View>
             </View>
@@ -126,7 +128,7 @@ export function ProfileScreen({ navigation }) {
           <Text style={common.filterTitle}>{isToday ? "Today's meals" : `${dateLabel(selectedDate)}'s meals`}</Text>
           <View style={{ marginTop: 8 }}>
             {logsLoading ? (
-              <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />
+              <ActivityIndicator style={{ marginTop: 14 }} color={colors.primary} />
             ) : logs.length === 0 ? (
               <Text style={dateNavStyles.emptyNote}>Nothing logged {isToday ? 'yet today' : 'this day'} — log a meal from a recipe's "Log this meal" button.</Text>
             ) : (
@@ -142,9 +144,9 @@ export function ProfileScreen({ navigation }) {
   );
 }
 
-const dateNavStyles = StyleSheet.create({
+function makeDateNavStyles(colors) { return StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, marginTop: 4, marginBottom: 4 },
   chevron: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  label: { fontFamily: FONTS.displaySemiBold, fontSize: 15, color: COLORS.ink, minWidth: 90, textAlign: 'center' },
-  emptyNote: { fontFamily: FONTS.bodyRegular, fontSize: 13, color: COLORS.inkMuted, marginTop: 6, lineHeight: 19 },
-});
+  label: { fontFamily: FONTS.displaySemiBold, fontSize: 15, color: colors.ink, minWidth: 90, textAlign: 'center' },
+  emptyNote: { fontFamily: FONTS.bodyRegular, fontSize: 13, color: colors.inkMuted, marginTop: 6, lineHeight: 19 },
+}); }

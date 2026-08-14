@@ -1,15 +1,15 @@
-// "Dashboard" — MyFitnessPal/Liftoff-inspired direction. Dark navy surfaces,
-// a real multi-accent palette (not one hue doing every job), rounded pill
-// controls. Replaces the kraft-paper/stamp and Night Kitchen identities
-// entirely — see the design review for the base-token provenance (dashboard
-// + fitness-app rows from the UI/UX Pro Max color database).
-export const COLORS = {
+// "Dashboard" — MyFitnessPal/Liftoff-inspired direction. A real multi-accent
+// palette (not one hue doing every job), rounded pill controls. Two complete,
+// independently-designed token sets — light is not a naive inversion of dark,
+// each accent is deepened/re-hued so it holds contrast on its own background.
+export const DARK_COLORS = {
   bg: '#0B0F17',            // page background
   surface: '#151B26',       // cards, recipe cards, tab bar
   surfaceRaised: '#1E2A3F', // inputs, pantry tags, icon badges — one step lighter than surface
 
   ink: '#EEF1F6',           // primary text/foreground
   inkMuted: '#8B95A8',      // secondary text
+  chipInactiveText: '#C7CEDB', // unselected chip/filter label — brighter than inkMuted since it's interactive
 
   primary: '#3B82F6',       // CTA, links, Shelf tab
   success: '#34D399',       // "ready to cook", positive states, Recipes tab
@@ -33,4 +33,33 @@ export const COLORS = {
   hairline: 'rgba(238,241,246,0.10)',
   errorBg: 'rgba(248,113,113,0.14)',
   errorText: '#FCA5A5',
+};
+
+export const LIGHT_COLORS = {
+  bg: '#F7F8FC',            // soft cool off-white, not stark white
+  surface: '#FFFFFF',
+  surfaceRaised: '#EEF1FA',
+
+  ink: '#151B26',
+  inkMuted: '#6B7280',
+  chipInactiveText: '#3F4757', // unselected chip/filter label — darker than inkMuted since it's interactive
+
+  primary: '#2563EB',
+  success: '#059669',
+  premium: '#D97706',
+
+  protein: '#EA580C',
+  carbs: '#0D9488',
+  fat: '#9333EA',
+  fiber: '#65A30D',
+
+  destructive: '#DC2626',
+
+  // Fills are now the darker, saturated element, so foreground text/icons
+  // painted on top need to be white rather than `ink`.
+  onFill: '#FFFFFF',
+
+  hairline: 'rgba(21,27,38,0.08)',
+  errorBg: 'rgba(220,38,38,0.08)',
+  errorText: '#B91C1C',
 };

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { COLORS } from '../theme/colors';
 import { FONTS } from '../theme/fonts';
+import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { logMeal } from '../lib/mealLogs';
 
@@ -14,6 +14,8 @@ import { logMeal } from '../lib/mealLogs';
 // re-estimated, never manually typed.
 export function LogMealButton({ recipe }) {
   const { userId } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
   const [servings, setServings] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -69,7 +71,7 @@ export function LogMealButton({ recipe }) {
   return (
     <View style={styles.wrap}>
       <Pressable onPress={toggleExpanded} style={[styles.button, justLogged && styles.buttonDone]}>
-        <Feather name={justLogged ? 'check-circle' : 'plus-circle'} size={16} color={COLORS.onFill} />
+        <Feather name={justLogged ? 'check-circle' : 'plus-circle'} size={16} color={colors.onFill} />
         <Text style={styles.buttonText}>{justLogged ? 'Logged!' : 'Log this meal'}</Text>
       </Pressable>
 
@@ -78,11 +80,11 @@ export function LogMealButton({ recipe }) {
           <Text style={styles.panelLabel}>Servings eaten</Text>
           <View style={styles.stepperRow}>
             <Pressable onPress={() => stepServings(-0.5)} style={styles.stepperBtn} accessibilityLabel="Decrease servings">
-              <Feather name="minus" size={16} color={COLORS.ink} />
+              <Feather name="minus" size={16} color={colors.ink} />
             </Pressable>
             <Text style={styles.stepperValue}>{servings}</Text>
             <Pressable onPress={() => stepServings(0.5)} style={styles.stepperBtn} accessibilityLabel="Increase servings">
-              <Feather name="plus" size={16} color={COLORS.ink} />
+              <Feather name="plus" size={16} color={colors.ink} />
             </Pressable>
           </View>
 
@@ -107,32 +109,32 @@ export function LogMealButton({ recipe }) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) { return StyleSheet.create({
   wrap: { marginTop: 12 },
   button: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
-    backgroundColor: COLORS.success, borderRadius: 999, borderCurve: 'continuous', minHeight: 44, paddingHorizontal: 16,
+    backgroundColor: colors.success, borderRadius: 999, borderCurve: 'continuous', minHeight: 44, paddingHorizontal: 16,
   },
-  buttonDone: { backgroundColor: COLORS.premium },
-  buttonText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: COLORS.onFill },
+  buttonDone: { backgroundColor: colors.premium },
+  buttonText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: colors.onFill },
 
   panel: {
-    marginTop: 10, backgroundColor: COLORS.surfaceRaised, borderRadius: 16, borderCurve: 'continuous', padding: 14,
+    marginTop: 10, backgroundColor: colors.surfaceRaised, borderRadius: 16, borderCurve: 'continuous', padding: 14,
   },
-  panelLabel: { fontFamily: FONTS.bodyBold, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: COLORS.inkMuted, marginBottom: 10 },
+  panelLabel: { fontFamily: FONTS.bodyBold, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: colors.inkMuted, marginBottom: 10 },
   stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20 },
   stepperBtn: {
-    width: 36, height: 36, borderRadius: 12, borderCurve: 'continuous', backgroundColor: COLORS.surface,
+    width: 36, height: 36, borderRadius: 12, borderCurve: 'continuous', backgroundColor: colors.surface,
     alignItems: 'center', justifyContent: 'center',
   },
-  stepperValue: { fontFamily: FONTS.displaySemiBold, fontSize: 20, color: COLORS.ink, minWidth: 40, textAlign: 'center' },
+  stepperValue: { fontFamily: FONTS.displaySemiBold, fontSize: 20, color: colors.ink, minWidth: 40, textAlign: 'center' },
 
-  preview: { fontFamily: FONTS.bodySemiBold, fontSize: 12.5, color: COLORS.inkMuted, textAlign: 'center', marginTop: 14 },
-  error: { fontFamily: FONTS.bodySemiBold, fontSize: 12.5, color: COLORS.errorText, textAlign: 'center', marginTop: 8 },
+  preview: { fontFamily: FONTS.bodySemiBold, fontSize: 12.5, color: colors.inkMuted, textAlign: 'center', marginTop: 14 },
+  error: { fontFamily: FONTS.bodySemiBold, fontSize: 12.5, color: colors.errorText, textAlign: 'center', marginTop: 8 },
 
   actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
-  cancelBtn: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 999, borderCurve: 'continuous', borderWidth: 1.5, borderColor: 'rgba(238,241,246,0.14)' },
-  cancelText: { fontFamily: FONTS.bodyBold, fontSize: 13, color: COLORS.inkMuted },
-  confirmBtn: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 999, borderCurve: 'continuous', backgroundColor: COLORS.primary },
-  confirmText: { fontFamily: FONTS.bodyBold, fontSize: 13, color: COLORS.onFill },
-});
+  cancelBtn: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 999, borderCurve: 'continuous', borderWidth: 1.5, borderColor: colors.hairline },
+  cancelText: { fontFamily: FONTS.bodyBold, fontSize: 13, color: colors.inkMuted },
+  confirmBtn: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 999, borderCurve: 'continuous', backgroundColor: colors.primary },
+  confirmText: { fontFamily: FONTS.bodyBold, fontSize: 13, color: colors.onFill },
+}); }

@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { COLORS } from '../theme/colors';
 import { FONTS } from '../theme/fonts';
+import { useTheme } from '../context/ThemeContext';
 
 // Decorative framing arc used when there's no target to compare against
 // (setting a target, or a recipe's flat per-serving calorie count) — not a
@@ -14,6 +14,8 @@ const DECORATIVE_ARC_FRACTION = 0.82;
 // matching the bar components below it. Omit it and the ring falls back to
 // the original flat display: a single number + unit label, decorative arc.
 export function MacroRing({ value, target, size = 148, unit = 'KCAL', label = 'KCAL / DAY' }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const stroke = Math.max(6, Math.round(size * 0.08));
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -27,11 +29,11 @@ export function MacroRing({ value, target, size = 148, unit = 'KCAL', label = 'K
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <Circle
           cx={size / 2} cy={size / 2} r={radius}
-          stroke={COLORS.hairline} strokeWidth={stroke} fill="none"
+          stroke={colors.hairline} strokeWidth={stroke} fill="none"
         />
         <Circle
           cx={size / 2} cy={size / 2} r={radius}
-          stroke={COLORS.primary} strokeWidth={stroke} fill="none"
+          stroke={colors.primary} strokeWidth={stroke} fill="none"
           strokeLinecap="round"
           strokeDasharray={`${circumference} ${circumference}`}
           strokeDashoffset={dashoffset}
@@ -52,9 +54,9 @@ export function MacroRing({ value, target, size = 148, unit = 'KCAL', label = 'K
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) { return StyleSheet.create({
   wrap: { alignItems: 'center', justifyContent: 'center' },
   center: { position: 'absolute', alignItems: 'center' },
-  value: { fontFamily: FONTS.displayExtraBold, color: COLORS.ink },
-  label: { fontFamily: FONTS.bodyBold, letterSpacing: 1.2, color: COLORS.inkMuted, marginTop: 2 },
-});
+  value: { fontFamily: FONTS.displayExtraBold, color: colors.ink },
+  label: { fontFamily: FONTS.bodyBold, letterSpacing: 1.2, color: colors.inkMuted, marginTop: 2 },
+}); }

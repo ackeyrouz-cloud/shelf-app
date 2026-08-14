@@ -4,8 +4,7 @@ import {
   ActivityIndicator, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import { COLORS } from '../theme/colors';
-import { common } from '../theme/common';
+import { useTheme, useCommonStyles } from '../context/ThemeContext';
 import { FilterBlock } from '../components/FilterBlock';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +17,8 @@ import { useAuth } from '../context/AuthContext';
 // by signing in with it fresh.
 export function ResetPasswordScreen() {
   const { clearPasswordRecovery, signOut } = useAuth();
+  const { colors } = useTheme();
+  const common = useCommonStyles();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [saving, setSaving] = useState(false);
@@ -59,7 +60,7 @@ export function ResetPasswordScreen() {
               <TextInput
                 style={common.input}
                 placeholder="At least 6 characters"
-                placeholderTextColor={COLORS.inkMuted}
+                placeholderTextColor={colors.inkMuted}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -71,7 +72,7 @@ export function ResetPasswordScreen() {
               <TextInput
                 style={common.input}
                 placeholder="Re-enter password"
-                placeholderTextColor={COLORS.inkMuted}
+                placeholderTextColor={colors.inkMuted}
                 value={confirm}
                 onChangeText={setConfirm}
                 secureTextEntry
@@ -83,7 +84,7 @@ export function ResetPasswordScreen() {
 
           <PrimaryButton label={saving ? 'Saving…' : 'Save new password'} onPress={submit} disabled={saving} />
 
-          {saving && <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />}
+          {saving && <ActivityIndicator style={{ marginTop: 14 }} color={colors.primary} />}
           {!!error && (
             <View style={common.errorBox}><Text style={common.errorText}>{error}</Text></View>
           )}

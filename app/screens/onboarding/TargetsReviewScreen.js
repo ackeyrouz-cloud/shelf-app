@@ -3,8 +3,7 @@ import {
   SafeAreaView, ScrollView, View, Text, TextInput,
   ActivityIndicator, Platform, KeyboardAvoidingView,
 } from 'react-native';
-import { COLORS } from '../../theme/colors';
-import { common } from '../../theme/common';
+import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 import { FilterBlock } from '../../components/FilterBlock';
 import { QuestionHeader } from '../../components/QuestionHeader';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -23,6 +22,8 @@ export function TargetsReviewScreen({ navigation }) {
     fiberInput, setFiberInput,
     saving, saveError, save,
   } = useOnboarding();
+  const { colors } = useTheme();
+  const common = useCommonStyles();
 
   const calories = parseFloat(caloriesInput) || 0;
   const protein = parseFloat(proteinInput) || 0;
@@ -62,9 +63,9 @@ export function TargetsReviewScreen({ navigation }) {
           </View>
 
           <View style={{ marginTop: 12 }}>
-            <MacroBar label="Protein" grams={protein} kcalPerGram={4} totalCalories={calories} color={COLORS.protein} />
-            <MacroBar label="Carbs" grams={carbs} kcalPerGram={4} totalCalories={calories} color={COLORS.carbs} />
-            <MacroBar label="Fat" grams={fat} kcalPerGram={9} totalCalories={calories} color={COLORS.fat} />
+            <MacroBar label="Protein" grams={protein} kcalPerGram={4} totalCalories={calories} color={colors.protein} />
+            <MacroBar label="Carbs" grams={carbs} kcalPerGram={4} totalCalories={calories} color={colors.carbs} />
+            <MacroBar label="Fat" grams={fat} kcalPerGram={9} totalCalories={calories} color={colors.fat} />
           </View>
 
           <View style={[common.card, { marginTop: 24 }]}>
@@ -87,7 +88,7 @@ export function TargetsReviewScreen({ navigation }) {
 
           <PrimaryButton label={saving ? 'Saving…' : isEditingExisting ? 'Save targets' : 'Save and continue'} onPress={handleSave} disabled={saving} />
 
-          {saving && <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />}
+          {saving && <ActivityIndicator style={{ marginTop: 14 }} color={colors.primary} />}
           {!!saveError && (
             <View style={common.errorBox}><Text style={common.errorText}>{saveError}</Text></View>
           )}

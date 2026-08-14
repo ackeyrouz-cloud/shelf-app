@@ -1,11 +1,12 @@
 import React from 'react';
 import { SafeAreaView, View, Text } from 'react-native';
-import { common } from '../theme/common';
+import { useCommonStyles } from '../context/ThemeContext';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { useProfile } from '../context/ProfileContext';
 
 export function ProfileErrorScreen() {
   const { profileError, loadProfile } = useProfile();
+  const common = useCommonStyles();
   return (
     <SafeAreaView style={[common.safe, { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 }]}>
       <View style={common.errorBox}><Text style={common.errorText}>{profileError}</Text></View>

@@ -1,14 +1,16 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
-import { COLORS } from '../theme/colors';
 import { FONTS } from '../theme/fonts';
+import { useTheme } from '../context/ThemeContext';
 
 // Labeled proportional bar — grams + share of daily calories from this
 // macro. Bars (not another ring/donut) for macro breakdown specifically:
 // part-to-whole rings read poorly for colorblind users, bars stay legible
 // with the label doing the real communicating and color as reinforcement only.
 export function MacroBar({ label, grams, kcalPerGram, totalCalories, color }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const kcal = grams * kcalPerGram;
   const fraction = totalCalories > 0 ? Math.max(0, Math.min(1, kcal / totalCalories)) : 0;
   const fill = useSharedValue(0);
@@ -33,11 +35,11 @@ export function MacroBar({ label, grams, kcalPerGram, totalCalories, color }) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) { return StyleSheet.create({
   row: { marginBottom: 14 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  label: { fontFamily: FONTS.bodyBold, fontSize: 11.5, letterSpacing: 0.6, textTransform: 'uppercase', color: COLORS.inkMuted },
-  grams: { fontFamily: FONTS.displaySemiBold, fontSize: 14, color: COLORS.ink },
-  track: { height: 9, borderRadius: 999, backgroundColor: COLORS.hairline, overflow: 'hidden' },
+  label: { fontFamily: FONTS.bodyBold, fontSize: 11.5, letterSpacing: 0.6, textTransform: 'uppercase', color: colors.inkMuted },
+  grams: { fontFamily: FONTS.displaySemiBold, fontSize: 14, color: colors.ink },
+  track: { height: 9, borderRadius: 999, backgroundColor: colors.hairline, overflow: 'hidden' },
   fill: { height: '100%', width: '100%', borderRadius: 999, transformOrigin: 'left' },
-});
+}); }

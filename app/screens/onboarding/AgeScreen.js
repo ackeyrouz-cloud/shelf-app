@@ -1,11 +1,12 @@
 import React from 'react';
 import { QuestionScreenLayout } from '../../components/QuestionScreenLayout';
 import { NumberWheelPicker } from '../../components/NumberWheelPicker';
-import { COLORS } from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
 import { useOnboarding } from '../../context/OnboardingContext';
 
 export function AgeScreen({ navigation }) {
   const { age, setAge } = useOnboarding();
+  const { colors } = useTheme();
 
   return (
     <QuestionScreenLayout
@@ -13,7 +14,7 @@ export function AgeScreen({ navigation }) {
       totalSteps={8}
       title="How old are you?"
       icon="calendar"
-      iconColor={COLORS.carbs}
+      iconColor={colors.carbs}
       onBack={() => navigation.goBack()}
       onContinue={() => navigation.navigate('Height')}
     >
@@ -24,7 +25,7 @@ export function AgeScreen({ navigation }) {
         max={100}
         step={1}
         unit="years"
-        accentColor={COLORS.carbs}
+        accentColor={colors.carbs}
       />
     </QuestionScreenLayout>
   );

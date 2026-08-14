@@ -1,6 +1,6 @@
 import React from 'react';
 import { SafeAreaView, View, Text, Platform, KeyboardAvoidingView } from 'react-native';
-import { common } from '../theme/common';
+import { useCommonStyles } from '../context/ThemeContext';
 import { QuestionHeader } from './QuestionHeader';
 import { PrimaryButton } from './PrimaryButton';
 
@@ -12,6 +12,7 @@ export function QuestionScreenLayout({
   step, totalSteps, onBack, title, subtitle, icon, iconFamily, iconColor, children,
   onContinue, continueLabel = 'Continue', continueDisabled = false, error,
 }) {
+  const common = useCommonStyles();
   return (
     <SafeAreaView style={common.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>

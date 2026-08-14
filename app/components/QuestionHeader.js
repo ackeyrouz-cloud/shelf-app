@@ -3,9 +3,8 @@ import { View, Text, Pressable } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { COLORS } from '../theme/colors';
 import { FONTS } from '../theme/fonts';
-import { common } from '../theme/common';
+import { useTheme, useCommonStyles } from '../context/ThemeContext';
 
 const ICON_SETS = { Feather, MaterialCommunityIcons };
 
@@ -13,7 +12,10 @@ const ICON_SETS = { Feather, MaterialCommunityIcons };
 // icon accent tied to the question) — shared by every onboarding screen,
 // including the review screen, which otherwise diverges from
 // QuestionScreenLayout's centered single-question shape.
-export function QuestionHeader({ step, totalSteps, onBack, title, subtitle, icon, iconFamily = 'Feather', iconColor = COLORS.primary }) {
+export function QuestionHeader({ step, totalSteps, onBack, title, subtitle, icon, iconFamily = 'Feather', iconColor }) {
+  const { colors } = useTheme();
+  const common = useCommonStyles();
+  const resolvedIconColor = iconColor || colors.primary;
   const progress = useSharedValue(0);
   const IconComponent = icon ? ICON_SETS[iconFamily] : null;
 
@@ -38,20 +40,20 @@ export function QuestionHeader({ step, totalSteps, onBack, title, subtitle, icon
             accessibilityRole="button"
             accessibilityLabel="Back to previous question"
           >
-            <Feather name="chevron-left" size={22} color={COLORS.ink} />
+            <Feather name="chevron-left" size={22} color={colors.ink} />
           </Pressable>
         ) : (
           <View style={{ width: 32 }} />
         )}
         <View
-          style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: COLORS.hairline, overflow: 'hidden' }}
+          style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.hairline, overflow: 'hidden' }}
           accessibilityRole="progressbar"
           accessibilityValue={{ min: 1, max: totalSteps, now: step }}
           accessibilityLabel={`Step ${step} of ${totalSteps}`}
         >
-          <Animated.View style={[{ height: '100%', width: '100%', backgroundColor: iconColor, borderRadius: 2, transformOrigin: 'left' }, fillStyle]} />
+          <Animated.View style={[{ height: '100%', width: '100%', backgroundColor: resolvedIconColor, borderRadius: 2, transformOrigin: 'left' }, fillStyle]} />
         </View>
-        <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: COLORS.inkMuted, minWidth: 30, textAlign: 'right' }}>
+        <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 12, color: colors.inkMuted, minWidth: 30, textAlign: 'right' }}>
           {step}/{totalSteps}
         </Text>
       </View>
@@ -60,9 +62,9 @@ export function QuestionHeader({ step, totalSteps, onBack, title, subtitle, icon
         {!!IconComponent && (
           <View style={{
             width: 44, height: 44, borderRadius: 14, borderCurve: 'continuous',
-            backgroundColor: `${iconColor}26`, alignItems: 'center', justifyContent: 'center', marginTop: 2,
+            backgroundColor: `${resolvedIconColor}26`, alignItems: 'center', justifyContent: 'center', marginTop: 2,
           }}>
-            <IconComponent name={icon} size={22} color={iconColor} />
+            <IconComponent name={icon} size={22} color={resolvedIconColor} />
           </View>
         )}
         <View style={{ flex: 1 }}>

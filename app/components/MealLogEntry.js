@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { COLORS } from '../theme/colors';
 import { FONTS } from '../theme/fonts';
+import { useTheme } from '../context/ThemeContext';
 import { updateMealLogServings, deleteMealLog } from '../lib/mealLogs';
 
 function formatTime(isoString) {
@@ -14,6 +14,8 @@ function formatTime(isoString) {
 // tap-to-expand pattern used everywhere else in the app, rather than a
 // swipe gesture — more discoverable and more accessible.
 export function MealLogEntry({ log, onChanged }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
   const [servings, setServings] = useState(log.servings_logged);
   const [saving, setSaving] = useState(false);
@@ -70,7 +72,7 @@ export function MealLogEntry({ log, onChanged }) {
           </Text>
         </View>
         <Text style={styles.calories}>{totalCalories} kcal</Text>
-        <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.inkMuted} />
+        <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.inkMuted} />
       </Pressable>
 
       {expanded && (
@@ -78,17 +80,17 @@ export function MealLogEntry({ log, onChanged }) {
           <Text style={styles.panelLabel}>Servings eaten</Text>
           <View style={styles.stepperRow}>
             <Pressable onPress={() => stepServings(-0.5)} style={styles.stepperBtn} accessibilityLabel="Decrease servings">
-              <Feather name="minus" size={16} color={COLORS.ink} />
+              <Feather name="minus" size={16} color={colors.ink} />
             </Pressable>
             <Text style={styles.stepperValue}>{servings}</Text>
             <Pressable onPress={() => stepServings(0.5)} style={styles.stepperBtn} accessibilityLabel="Increase servings">
-              <Feather name="plus" size={16} color={COLORS.ink} />
+              <Feather name="plus" size={16} color={colors.ink} />
             </Pressable>
           </View>
 
           <View style={styles.actions}>
             <Pressable onPress={confirmDelete} style={styles.deleteBtn}>
-              <Feather name="trash-2" size={14} color={COLORS.destructive} />
+              <Feather name="trash-2" size={14} color={colors.destructive} />
               <Text style={styles.deleteText}>Delete</Text>
             </Pressable>
             <Pressable
@@ -105,28 +107,28 @@ export function MealLogEntry({ log, onChanged }) {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { backgroundColor: COLORS.surfaceRaised, borderRadius: 14, borderCurve: 'continuous', marginBottom: 8, overflow: 'hidden' },
+function makeStyles(colors) { return StyleSheet.create({
+  wrap: { backgroundColor: colors.surfaceRaised, borderRadius: 14, borderCurve: 'continuous', marginBottom: 8, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
-  title: { fontFamily: FONTS.bodyBold, fontSize: 14, color: COLORS.ink },
-  meta: { fontFamily: FONTS.bodyRegular, fontSize: 12, color: COLORS.inkMuted, marginTop: 2 },
-  calories: { fontFamily: FONTS.displaySemiBold, fontSize: 13, color: COLORS.ink },
+  title: { fontFamily: FONTS.bodyBold, fontSize: 14, color: colors.ink },
+  meta: { fontFamily: FONTS.bodyRegular, fontSize: 12, color: colors.inkMuted, marginTop: 2 },
+  calories: { fontFamily: FONTS.displaySemiBold, fontSize: 13, color: colors.ink },
 
   panel: { paddingHorizontal: 12, paddingBottom: 14, paddingTop: 2 },
-  panelLabel: { fontFamily: FONTS.bodyBold, fontSize: 10.5, letterSpacing: 0.6, textTransform: 'uppercase', color: COLORS.inkMuted, marginBottom: 8 },
+  panelLabel: { fontFamily: FONTS.bodyBold, fontSize: 10.5, letterSpacing: 0.6, textTransform: 'uppercase', color: colors.inkMuted, marginBottom: 8 },
   stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20 },
   stepperBtn: {
-    width: 32, height: 32, borderRadius: 10, borderCurve: 'continuous', backgroundColor: COLORS.surface,
+    width: 32, height: 32, borderRadius: 10, borderCurve: 'continuous', backgroundColor: colors.surface,
     alignItems: 'center', justifyContent: 'center',
   },
-  stepperValue: { fontFamily: FONTS.displaySemiBold, fontSize: 17, color: COLORS.ink, minWidth: 36, textAlign: 'center' },
+  stepperValue: { fontFamily: FONTS.displaySemiBold, fontSize: 17, color: colors.ink, minWidth: 36, textAlign: 'center' },
 
   actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
   deleteBtn: {
     flex: 1, flexDirection: 'row', gap: 6, minHeight: 38, alignItems: 'center', justifyContent: 'center',
-    borderRadius: 999, borderCurve: 'continuous', borderWidth: 1.5, borderColor: `${COLORS.destructive}40`,
+    borderRadius: 999, borderCurve: 'continuous', borderWidth: 1.5, borderColor: `${colors.destructive}40`,
   },
-  deleteText: { fontFamily: FONTS.bodyBold, fontSize: 12.5, color: COLORS.destructive },
-  saveBtn: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 999, borderCurve: 'continuous', backgroundColor: COLORS.primary },
-  saveText: { fontFamily: FONTS.bodyBold, fontSize: 12.5, color: COLORS.onFill },
-});
+  deleteText: { fontFamily: FONTS.bodyBold, fontSize: 12.5, color: colors.destructive },
+  saveBtn: { flex: 1, minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 999, borderCurve: 'continuous', backgroundColor: colors.primary },
+  saveText: { fontFamily: FONTS.bodyBold, fontSize: 12.5, color: colors.onFill },
+}); }

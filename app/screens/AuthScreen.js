@@ -6,13 +6,14 @@ import {
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../lib/supabase';
 import { passwordResetRedirectUrl } from '../lib/deepLinks';
-import { COLORS } from '../theme/colors';
-import { common } from '../theme/common';
+import { useTheme, useCommonStyles } from '../context/ThemeContext';
 import { FilterBlock } from '../components/FilterBlock';
 import { PrimaryButton } from '../components/PrimaryButton';
 
 // mode: 'signin' | 'signup' | 'forgot'
 export function AuthScreen() {
+  const { colors } = useTheme();
+  const common = useCommonStyles();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState('signin');
@@ -102,7 +103,7 @@ export function AuthScreen() {
               <TextInput
                 style={common.input}
                 placeholder="you@example.com"
-                placeholderTextColor={COLORS.inkMuted}
+                placeholderTextColor={colors.inkMuted}
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
@@ -116,7 +117,7 @@ export function AuthScreen() {
                 <TextInput
                   style={common.input}
                   placeholder="At least 6 characters"
-                  placeholderTextColor={COLORS.inkMuted}
+                  placeholderTextColor={colors.inkMuted}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
@@ -135,7 +136,7 @@ export function AuthScreen() {
 
           <PrimaryButton label={ctaLabel} onPress={submit} disabled={loading} />
 
-          {loading && <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />}
+          {loading && <ActivityIndicator style={{ marginTop: 14 }} color={colors.primary} />}
           {!!error && (
             <View style={common.errorBox}><Text style={common.errorText}>{error}</Text></View>
           )}

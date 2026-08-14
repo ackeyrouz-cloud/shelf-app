@@ -3,8 +3,7 @@ import {
   SafeAreaView, ScrollView, View, Text, TextInput,
   ActivityIndicator, Platform, KeyboardAvoidingView,
 } from 'react-native';
-import { COLORS } from '../../theme/colors';
-import { common } from '../../theme/common';
+import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 import { FilterBlock } from '../../components/FilterBlock';
 import { ChipRow, MultiChipRow } from '../../components/ChipRow';
 import { RecipeCard } from '../../components/RecipeCard';
@@ -15,6 +14,8 @@ import { API_BASE_URL, REQUEST_TIMEOUT_MS, TIMEOUT_MESSAGE, OVERLOADED_MESSAGE }
 
 export function RecipesScreen() {
   const { pantry } = usePantry();
+  const { colors } = useTheme();
+  const common = useCommonStyles();
 
   const [diets, setDiets] = useState(['none']);
   const [time, setTime] = useState('any');
@@ -143,7 +144,7 @@ export function RecipesScreen() {
               <TextInput
                 style={common.input}
                 placeholder="e.g. cozy, spicy, Italian, quick weeknight"
-                placeholderTextColor={COLORS.inkMuted}
+                placeholderTextColor={colors.inkMuted}
                 value={mood}
                 onChangeText={setMood}
                 accessibilityLabel="Mood or style"
@@ -155,7 +156,7 @@ export function RecipesScreen() {
 
           {loading && (
             <>
-              <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />
+              <ActivityIndicator style={{ marginTop: 14 }} color={colors.primary} />
               <Text style={[common.tagline, { textAlign: 'center', marginTop: 10 }]}>{loadingMessage}</Text>
             </>
           )}

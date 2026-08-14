@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   SafeAreaView, ScrollView, View, Text, TextInput, Pressable,
   StyleSheet, ActivityIndicator, Platform, KeyboardAvoidingView, Alert,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { COLORS } from '../../theme/colors';
 import { FONTS } from '../../theme/fonts';
-import { common } from '../../theme/common';
+import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 import { usePantry } from '../../context/PantryContext';
 
 export function ShelfScreen() {
   const { pantry, pantryLoading, pantryBusy, pantryError, photoLoading, photoError, addFromText, removeItem, clearAll, pickPhoto } = usePantry();
+  const { colors } = useTheme();
+  const common = useCommonStyles();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [inputText, setInputText] = useState('');
 
   const submitText = () => {
@@ -50,7 +52,7 @@ export function ShelfScreen() {
           <View style={common.header}>
             <View style={styles.headerRow}>
               <View style={styles.headerIcon}>
-                <MaterialCommunityIcons name="fridge-outline" size={22} color={COLORS.carbs} />
+                <MaterialCommunityIcons name="fridge-outline" size={22} color={colors.carbs} />
               </View>
               <Text style={common.eyebrow}>SHELF</Text>
             </View>
@@ -71,7 +73,7 @@ export function ShelfScreen() {
               <TextInput
                 style={common.input}
                 placeholder="e.g. chicken thighs, rice, half an onion"
-                placeholderTextColor={COLORS.inkMuted}
+                placeholderTextColor={colors.inkMuted}
                 value={inputText}
                 onChangeText={setInputText}
                 onSubmitEditing={submitText}
@@ -86,17 +88,17 @@ export function ShelfScreen() {
 
             <Pressable style={styles.photoBtn} onPress={handlePickPhoto} disabled={photoLoading}>
               {photoLoading
-                ? <ActivityIndicator color={COLORS.fat} />
+                ? <ActivityIndicator color={colors.fat} />
                 : (
                   <>
-                    <Feather name="camera" size={16} color={COLORS.fat} />
+                    <Feather name="camera" size={16} color={colors.fat} />
                     <Text style={styles.photoBtnText}>Snap a photo of your shelf</Text>
                   </>
                 )}
             </Pressable>
 
             {pantryLoading ? (
-              <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />
+              <ActivityIndicator style={{ marginTop: 14 }} color={colors.primary} />
             ) : (
               <>
                 {pantry.length > 0 && (
@@ -117,7 +119,7 @@ export function ShelfScreen() {
                         accessibilityRole="button"
                         accessibilityLabel={`Remove ${item.name}`}
                       >
-                        <Feather name="x" size={13} color={COLORS.inkMuted} />
+                        <Feather name="x" size={13} color={colors.inkMuted} />
                       </Pressable>
                     </View>
                   ))}
@@ -138,40 +140,40 @@ export function ShelfScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) { return StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   headerIcon: {
     width: 30, height: 30, borderRadius: 10, borderCurve: 'continuous',
-    backgroundColor: `${COLORS.carbs}22`, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: `${colors.carbs}22`, alignItems: 'center', justifyContent: 'center',
   },
   countPill: {
     flexDirection: 'row', alignItems: 'baseline', gap: 4,
-    backgroundColor: `${COLORS.protein}22`, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12, marginTop: 4,
+    backgroundColor: `${colors.protein}22`, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12, marginTop: 4,
   },
-  countPillText: { fontFamily: FONTS.displaySemiBold, fontSize: 15, color: COLORS.protein },
-  countPillLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5, color: COLORS.protein },
+  countPillText: { fontFamily: FONTS.displaySemiBold, fontSize: 15, color: colors.protein },
+  countPillLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5, color: colors.protein },
 
   addRow: { flexDirection: 'row', gap: 8 },
-  addBtn: { backgroundColor: COLORS.success, paddingHorizontal: 20, minHeight: 48, justifyContent: 'center', borderRadius: 999 },
-  addBtnText: { fontFamily: FONTS.bodyBold, fontSize: 15, color: COLORS.onFill },
+  addBtn: { backgroundColor: colors.success, paddingHorizontal: 20, minHeight: 48, justifyContent: 'center', borderRadius: 999 },
+  addBtnText: { fontFamily: FONTS.bodyBold, fontSize: 15, color: colors.onFill },
 
   photoBtn: {
     marginTop: 12, flexDirection: 'row', gap: 8,
-    backgroundColor: `${COLORS.fat}18`,
+    backgroundColor: `${colors.fat}18`,
     borderRadius: 999, paddingVertical: 13, minHeight: 48, alignItems: 'center', justifyContent: 'center',
   },
   photoBtnText: {
-    fontFamily: FONTS.bodyBold, fontSize: 13.5, color: COLORS.fat,
+    fontFamily: FONTS.bodyBold, fontSize: 13.5, color: colors.fat,
   },
 
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 },
   tag: {
-    flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: COLORS.surfaceRaised,
+    flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: colors.surfaceRaised,
     borderRadius: 999, paddingVertical: 8, paddingHorizontal: 13,
   },
-  tagDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.success },
-  tagText: { fontFamily: FONTS.bodySemiBold, fontSize: 13, color: COLORS.ink },
+  tagDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
+  tagText: { fontFamily: FONTS.bodySemiBold, fontSize: 13, color: colors.ink },
   tagRemoveHit: { minWidth: 20, minHeight: 20, alignItems: 'center', justifyContent: 'center' },
-  emptyNote: { fontFamily: FONTS.bodyRegular, fontSize: 13, color: COLORS.inkMuted, marginTop: 14 },
-  clearAllText: { fontFamily: FONTS.bodyBold, fontSize: 12.5, color: COLORS.destructive },
-});
+  emptyNote: { fontFamily: FONTS.bodyRegular, fontSize: 13, color: colors.inkMuted, marginTop: 14 },
+  clearAllText: { fontFamily: FONTS.bodyBold, fontSize: 12.5, color: colors.destructive },
+}); }

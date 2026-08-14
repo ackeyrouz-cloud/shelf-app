@@ -3,13 +3,14 @@ import { Text } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { common } from '../theme/common';
+import { useCommonStyles } from '../context/ThemeContext';
 
 // The primary pill CTA used across nearly every screen (onboarding Continue/
 // Save, Auth sign in, Find Recipes, ...). Built once as a shared component
 // so the press-scale feedback is consistent everywhere instead of each
 // screen re-implementing its own TouchableOpacity.
 export function PrimaryButton({ label, onPress, disabled = false, style }) {
+  const common = useCommonStyles();
   const pressed = useSharedValue(0);
 
   const tap = Gesture.Tap()

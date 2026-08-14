@@ -1,11 +1,12 @@
 import React from 'react';
 import { QuestionScreenLayout } from '../../components/QuestionScreenLayout';
 import { NumberWheelPicker } from '../../components/NumberWheelPicker';
-import { COLORS } from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
 import { useOnboarding } from '../../context/OnboardingContext';
 
 export function HeightScreen({ navigation }) {
   const { height, setHeight } = useOnboarding();
+  const { colors } = useTheme();
 
   return (
     <QuestionScreenLayout
@@ -14,7 +15,7 @@ export function HeightScreen({ navigation }) {
       title="How tall are you?"
       icon="human-male-height"
       iconFamily="MaterialCommunityIcons"
-      iconColor={COLORS.fat}
+      iconColor={colors.fat}
       onBack={() => navigation.goBack()}
       onContinue={() => navigation.navigate('Weight')}
     >
@@ -25,7 +26,7 @@ export function HeightScreen({ navigation }) {
         max={220}
         step={1}
         unit="cm"
-        accentColor={COLORS.fat}
+        accentColor={colors.fat}
       />
     </QuestionScreenLayout>
   );

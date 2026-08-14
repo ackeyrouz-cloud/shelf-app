@@ -2,7 +2,7 @@ import React from 'react';
 import { View } from 'react-native';
 import { QuestionScreenLayout } from '../../components/QuestionScreenLayout';
 import { SelectableCard } from '../../components/SelectableCard';
-import { COLORS } from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
 import { SEX_OPTIONS } from '../../lib/targets';
 import { useOnboarding } from '../../context/OnboardingContext';
 
@@ -10,6 +10,7 @@ const SEX_ICONS = { male: 'human-male', female: 'human-female' };
 
 export function SexScreen({ navigation }) {
   const { sex, setSex } = useOnboarding();
+  const { colors } = useTheme();
 
   return (
     <QuestionScreenLayout
@@ -30,7 +31,7 @@ export function SexScreen({ navigation }) {
             label={opt.label}
             selected={sex === opt.v}
             onPress={() => setSex(opt.v)}
-            accentColor={COLORS.primary}
+            accentColor={colors.primary}
           />
         ))}
       </View>
