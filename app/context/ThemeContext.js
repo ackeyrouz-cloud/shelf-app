@@ -8,11 +8,11 @@ const STORAGE_KEY = 'shelf.themeMode';
 const ThemeContext = createContext(undefined);
 
 export function ThemeProvider({ children }) {
-  // Starts on the app's established default (dark) and swaps in the stored
+  // Starts on the default for new users (light) and swaps in the stored
   // preference once AsyncStorage resolves, rather than blocking the first
-  // render on it — a brief dark->light swap for light-mode users is less
+  // render on it — a brief light->dark swap for dark-mode users is less
   // disruptive than a blank screen for everyone on every launch.
-  const [mode, setMode] = useState('dark');
+  const [mode, setMode] = useState('light');
 
   useEffect(() => {
     (async () => {
