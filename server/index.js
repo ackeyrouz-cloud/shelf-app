@@ -573,7 +573,15 @@ If (and only if) you genuinely cannot estimate at all:
 
 "name" should be a clean, title-cased short name for what was described. "isBeverage" should be true only for actual drinks. All numeric fields are required and must be positive numbers when needsClarification is false.`;
 
-    const data = await callClaude([{ role: 'user', content: prompt }], 500);
+    // 500 was too low, confirmed live: this prompt's step-by-step
+    // ingredient-by-ingredient reasoning (the same methodology /find-recipes
+    // uses, which gives itself 12288 tokens for exactly this reason) pushed
+    // the model into extended thinking that consumed the entire 500-token
+    // budget before any actual text answer — stop_reason: "max_tokens" with
+    // a content array containing only an empty thinking block, nothing else.
+    // A single food's estimate needs much less than a multi-recipe response,
+    // so this is sized well below /find-recipes rather than matching it.
+    const data = await callClaude([{ role: 'user', content: prompt }], 2000);
     const textBlock = (data.content || []).find((b) => b.type === 'text');
     if (!textBlock) {
       console.error('/estimate-meal: no text block in response. stop_reason:', data.stop_reason, '| content:', JSON.stringify(data.content).slice(0, 500));
