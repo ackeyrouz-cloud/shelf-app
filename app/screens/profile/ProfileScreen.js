@@ -140,11 +140,11 @@ export function ProfileScreen({ navigation }) {
                 </View>
               )}
               <Pressable
-                onPress={() => navigation.navigate('LogMeal')}
+                onPress={() => navigation.navigate('LogMealMethod')}
                 hitSlop={10}
                 style={dateNavStyles.addBtn}
                 accessibilityRole="button"
-                accessibilityLabel="Log a meal manually"
+                accessibilityLabel="Log a meal"
               >
                 <Feather name="plus" size={16} color={colors.onFill} />
               </Pressable>
@@ -154,7 +154,7 @@ export function ProfileScreen({ navigation }) {
             {logsLoading ? (
               <ActivityIndicator style={{ marginTop: 14 }} color={colors.primary} />
             ) : logs.length === 0 ? (
-              <Text style={dateNavStyles.emptyNote}>Nothing logged {isToday ? 'yet today' : 'this day'} — log a meal from a recipe's "Log this meal" button, or add one manually with the + above.</Text>
+              <Text style={dateNavStyles.emptyNote}>Nothing logged {isToday ? 'yet today' : 'this day'} — log a meal from a recipe's "Log this meal" button, or search or type one in with the + above.</Text>
             ) : (
               logs.map((log) => <MealLogEntry key={log.id} log={log} onChanged={fetchLogs} />)
             )}

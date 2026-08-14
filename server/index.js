@@ -60,6 +60,19 @@ if (!ANTHROPIC_API_KEY) {
   console.warn('WARNING: ANTHROPIC_API_KEY is not set. Requests will fail.');
 }
 
+// USDA FoodData Central — free, but does require a registered key (unlike
+// Open Food Facts) and that key must stay server-side, same reasoning as
+// the Anthropic key. Sign up at fdc.nal.usda.gov/api-key-signup.
+const USDA_FDC_API_KEY = process.env.USDA_FDC_API_KEY;
+if (!USDA_FDC_API_KEY) {
+  console.warn('WARNING: USDA_FDC_API_KEY is not set. /food-search will only return Open Food Facts results.');
+}
+// Per-upstream timeout for /food-search — this backs a live, debounced
+// search-as-you-type UI, so a slow provider needs to fail fast rather than
+// hold up the whole search. Both providers are queried in parallel and a
+// slow/failed one just means fewer results, not a failed search.
+const FOOD_SEARCH_TIMEOUT_MS = 6000;
+
 async function callClaude(messages, maxTokens = 1000) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -365,6 +378,157 @@ If a recipe needs nothing extra, "missing" should be an empty array.
     }
     res.status(500).json({ error: 'Failed to generate recipes' });
   }
+});
+
+// Best-effort parse of Open Food Facts' free-text serving_size field (e.g.
+// "1 bar (40 g)", "30 g", "1 cup (228g)", "500ml") into a gram/ml amount.
+// Deliberately conservative: returns null on anything that doesn't clearly
+// contain a number+unit, rather than guessing — a missing named-serving
+// shortcut is harmless (falls back to the standard unit list), a wrong one
+// silently mis-scales someone's nutrition numbers.
+function parseServingSize(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const match = raw.match(/(\d+(?:[.,]\d+)?)\s*(kg|g|l|ml)\b/i);
+  if (!match) return null;
+  const amount = parseFloat(match[1].replace(',', '.'));
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const unit = match[2].toLowerCase();
+  const grams = unit === 'kg' ? amount * 1000 : unit === 'l' ? amount * 1000 : amount;
+  return { label: raw.trim(), grams };
+}
+
+// Open Food Facts' top-level umbrella tag for nearly all plant products is
+// "en:plant-based-foods-and-beverages" — a naive substring match on
+// "beverage" incorrectly flags a plain banana as a drink because of that tag
+// alone. Match only real beverage tags: the "en:beverages" branch itself
+// (present as an ancestor tag on genuine drinks, confirmed live against
+// Coca-Cola's actual category list) plus a fixed set of specific drink leaf
+// categories, as a redundant check for sparser/incomplete crowd-sourced tags.
+const OFF_BEVERAGE_TAGS = new Set([
+  'en:sodas', 'en:juices', 'en:waters', 'en:colas', 'en:carbonated-drinks',
+  'en:teas', 'en:coffees', 'en:alcoholic-beverages', 'en:beers', 'en:wines',
+  'en:smoothies', 'en:energy-drinks', 'en:plant-milks', 'en:milks',
+  'en:fruit-juices', 'en:vegetable-juices', 'en:hot-beverages', 'en:cold-beverages',
+]);
+
+function offIsBeverage(categoriesTags) {
+  if (!Array.isArray(categoriesTags)) return false;
+  return categoriesTags.some((t) => {
+    const tag = String(t);
+    return tag.startsWith('en:beverages') || OFF_BEVERAGE_TAGS.has(tag);
+  });
+}
+
+function normalizeOffHit(hit) {
+  const n = hit.nutriments || {};
+  const calories = Number(n['energy-kcal_100g']);
+  if (!Number.isFinite(calories)) return null; // no usable nutrition data — skip rather than show a blank result
+
+  const brands = Array.isArray(hit.brands) ? hit.brands.filter(Boolean) : [];
+  const namedServing = parseServingSize(hit.serving_size);
+
+  return {
+    id: `off:${hit.code}`,
+    source: 'off',
+    offCode: hit.code,
+    name: hit.product_name || 'Unnamed product',
+    brand: brands.length ? [...new Set(brands)].join(', ') : null,
+    caloriesPer100: calories,
+    proteinPer100: Number.isFinite(Number(n.proteins_100g)) ? Number(n.proteins_100g) : 0,
+    carbsPer100: Number.isFinite(Number(n.carbohydrates_100g)) ? Number(n.carbohydrates_100g) : 0,
+    fatPer100: Number.isFinite(Number(n.fat_100g)) ? Number(n.fat_100g) : 0,
+    fiberPer100: Number.isFinite(Number(n.fiber_100g)) ? Number(n.fiber_100g) : null,
+    isBeverage: offIsBeverage(hit.categories_tags),
+    namedServings: namedServing ? [namedServing] : [],
+  };
+}
+
+async function searchOpenFoodFacts(query) {
+  const url = `https://search.openfoodfacts.org/search?q=${encodeURIComponent(query)}&page_size=15&fields=product_name,brands,nutriments,serving_size,categories_tags,code`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(FOOD_SEARCH_TIMEOUT_MS) });
+  if (!res.ok) throw new Error(`Open Food Facts error ${res.status}`);
+  const data = await res.json();
+  return (data.hits || []).map(normalizeOffHit).filter(Boolean);
+}
+
+// USDA nutrient numbers are the stable identifiers (nutrientName strings
+// vary slightly across records) — see fdc.nal.usda.gov for the full list.
+const USDA_NUTRIENT_NUMBERS = { calories: '208', protein: '203', carbs: '205', fat: '204', fiber: '291' };
+
+const USDA_BEVERAGE_KEYWORDS = ['beverage', 'juice', 'soda', 'water', 'drink', 'coffee', 'tea', 'milk', 'alcohol'];
+
+function normalizeUsdaFood(food) {
+  const byNumber = {};
+  for (const fn of food.foodNutrients || []) {
+    if (fn.nutrientNumber) byNumber[fn.nutrientNumber] = fn.value;
+  }
+  const calories = Number(byNumber[USDA_NUTRIENT_NUMBERS.calories]);
+  if (!Number.isFinite(calories)) return null;
+
+  const category = String(food.foodCategory || '').toLowerCase();
+
+  return {
+    id: `usda:${food.fdcId}`,
+    source: 'usda',
+    usdaId: String(food.fdcId),
+    name: food.description || 'Unnamed food',
+    brand: null, // Branded Foods are excluded (see searchUsda) — generic entries have no brand
+    caloriesPer100: calories,
+    proteinPer100: Number.isFinite(Number(byNumber[USDA_NUTRIENT_NUMBERS.protein])) ? Number(byNumber[USDA_NUTRIENT_NUMBERS.protein]) : 0,
+    carbsPer100: Number.isFinite(Number(byNumber[USDA_NUTRIENT_NUMBERS.carbs])) ? Number(byNumber[USDA_NUTRIENT_NUMBERS.carbs]) : 0,
+    fatPer100: Number.isFinite(Number(byNumber[USDA_NUTRIENT_NUMBERS.fat])) ? Number(byNumber[USDA_NUTRIENT_NUMBERS.fat]) : 0,
+    fiberPer100: Number.isFinite(Number(byNumber[USDA_NUTRIENT_NUMBERS.fiber])) ? Number(byNumber[USDA_NUTRIENT_NUMBERS.fiber]) : null,
+    isBeverage: USDA_BEVERAGE_KEYWORDS.some((k) => category.includes(k)),
+    namedServings: [], // not returned by the search endpoint (only the per-food detail endpoint) — standard units still work
+  };
+}
+
+async function searchUsda(query) {
+  if (!USDA_FDC_API_KEY) return [];
+  // Restricted to the generic/whole-food data types on purpose: Foundation,
+  // SR Legacy, and Survey (FNDDS) nutrient values are reliably per-100g by
+  // USDA convention. Branded Foods report per-serving instead, which would
+  // need a separate, less certain scaling path — and that ground is already
+  // covered better by Open Food Facts anyway, so it's excluded rather than
+  // guessed at.
+  const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&pageSize=15&dataType=Foundation,SR%20Legacy,Survey%20(FNDDS)&api_key=${USDA_FDC_API_KEY}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(FOOD_SEARCH_TIMEOUT_MS) });
+  if (!res.ok) throw new Error(`USDA FDC error ${res.status}`);
+  const data = await res.json();
+  return (data.foods || []).map(normalizeUsdaFood).filter(Boolean);
+}
+
+// GET /food-search?q=...
+app.get('/food-search', async (req, res) => {
+  const query = String(req.query.q || '').trim();
+  if (!query) return res.status(400).json({ error: 'Missing search query' });
+
+  const [offResult, usdaResult] = await Promise.allSettled([
+    searchOpenFoodFacts(query),
+    searchUsda(query),
+  ]);
+
+  if (offResult.status === 'rejected') console.error('/food-search: Open Food Facts failed:', offResult.reason);
+  if (usdaResult.status === 'rejected') console.error('/food-search: USDA FDC failed:', usdaResult.reason);
+
+  const results = [
+    ...(usdaResult.status === 'fulfilled' ? usdaResult.value : []),
+    ...(offResult.status === 'fulfilled' ? offResult.value : []),
+  ];
+
+  // One source failing entirely (timeout, outage, bad key) still returns the
+  // other's results rather than failing the whole search — but the client
+  // gets told which source(s) came back so it's never silently incomplete.
+  // searchUsda() resolves to [] rather than rejecting when no key is
+  // configured (not an error, a config state), so that case is checked
+  // explicitly rather than read off the promise's fulfilled/rejected status.
+  res.json({
+    results,
+    sources: {
+      off: offResult.status === 'fulfilled' ? 'ok' : 'error',
+      usda: !USDA_FDC_API_KEY ? 'not_configured' : (usdaResult.status === 'fulfilled' ? 'ok' : 'error'),
+    },
+  });
 });
 
 // POST /delete-account  Authorization: Bearer <supabase access token>
