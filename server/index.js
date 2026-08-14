@@ -118,11 +118,20 @@ function findDietViolations(recipe, activeDiets) {
 // NaN) even when instructed not to. Rather than reject an otherwise-good
 // recipe over that, strip just the bad field so the client's "only render if
 // present" check (recipe.calories != null) quietly hides that one badge.
+//
+// fiberG allows exactly 0 — a real, common value (plenty of recipes, e.g.
+// anything meat/egg/dairy-only, genuinely have ~0g fiber) — while the other
+// four stay strictly positive-only, since a recipe with 0 calories or 0g of
+// every macro is a model error, not a legitimate value. Confirmed live: this
+// exact `n <= 0` check was silently deleting valid `fiberG: 0` results,
+// which is why fiber appeared to be missing far more often than the other
+// macros — not a truncation issue and not a frontend rendering bug.
 function sanitizeMacros(recipe) {
   const clean = { ...recipe };
   for (const field of ['calories', 'proteinG', 'carbsG', 'fatG', 'fiberG']) {
     const n = Number(clean[field]);
-    if (!Number.isFinite(n) || n <= 0) delete clean[field];
+    const min = field === 'fiberG' ? 0 : 0.0001;
+    if (!Number.isFinite(n) || n < min) delete clean[field];
     else clean[field] = n;
   }
   return clean;
