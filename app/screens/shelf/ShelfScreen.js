@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   SafeAreaView, ScrollView, View, Text, TextInput, Pressable,
-  StyleSheet, ActivityIndicator, Platform, KeyboardAvoidingView,
+  StyleSheet, ActivityIndicator, Platform, KeyboardAvoidingView, Alert,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -11,7 +11,7 @@ import { common } from '../../theme/common';
 import { usePantry } from '../../context/PantryContext';
 
 export function ShelfScreen() {
-  const { pantry, pantryLoading, pantryBusy, pantryError, photoLoading, photoError, addFromText, removeItem, pickPhoto } = usePantry();
+  const { pantry, pantryLoading, pantryBusy, pantryError, photoLoading, photoError, addFromText, removeItem, clearAll, pickPhoto } = usePantry();
   const [inputText, setInputText] = useState('');
 
   const submitText = () => {
@@ -28,6 +28,18 @@ export function ShelfScreen() {
   const handleRemove = (id) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     removeItem(id);
+  };
+
+  const handleClearAll = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert(
+      'Clear your whole pantry?',
+      `This removes all ${pantry.length} item${pantry.length === 1 ? '' : 's'}. You can always add them back later.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Clear All', style: 'destructive', onPress: clearAll },
+      ],
+    );
   };
 
   return (
@@ -87,6 +99,11 @@ export function ShelfScreen() {
               <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />
             ) : (
               <>
+                {pantry.length > 0 && (
+                  <Pressable onPress={handleClearAll} disabled={pantryBusy} style={{ marginTop: 16, alignSelf: 'flex-start' }}>
+                    <Text style={styles.clearAllText}>Clear all</Text>
+                  </Pressable>
+                )}
                 <View style={styles.tags}>
                   {pantry.map((item) => (
                     <View key={item.id} style={styles.tag}>
@@ -156,4 +173,5 @@ const styles = StyleSheet.create({
   tagText: { fontFamily: FONTS.bodySemiBold, fontSize: 13, color: COLORS.ink },
   tagRemoveHit: { minWidth: 20, minHeight: 20, alignItems: 'center', justifyContent: 'center' },
   emptyNote: { fontFamily: FONTS.bodyRegular, fontSize: 13, color: COLORS.inkMuted, marginTop: 14 },
+  clearAllText: { fontFamily: FONTS.bodyBold, fontSize: 12.5, color: COLORS.destructive },
 });

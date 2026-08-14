@@ -79,6 +79,12 @@ export function RecipesScreen() {
           if (data.dietMismatch) {
             const activeDietLabels = diets.filter(d => d !== 'none').map(dietLabel).join(', ');
             setError(`Your pantry doesn't have much that fits ${activeDietLabels}. Try adding more compatible ingredients or loosening your diet filter.`);
+          } else if (data.generationFailed) {
+            // Distinct from a real filter mismatch — the backend couldn't
+            // produce a usable response at all (most often a very large
+            // pantry pushing the response past its token budget), which has
+            // nothing to do with which filters are selected.
+            setError("Recipe generation hit a snag — this can happen with a large pantry list. Try again, or trim a few items and search once more.");
           } else {
             setError('No recipes matched every filter you chose — try loosening one and search again.');
           }

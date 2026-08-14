@@ -229,9 +229,13 @@ The "time" field must be the realistic TOTAL time for an average home cook — p
 
 Every entry in "steps" must be exactly one clear action — never combine multiple actions into one sentence. Every step involving actual cooking (boiling, simmering, sautéing, baking, roasting, grilling, frying) must include a specific time range, e.g. "Simmer the rice, covered, for 15-18 minutes" rather than "cook the rice." For any step cooking meat, include both a time estimate AND a doneness cue — visual, tactile, or temperature-based (e.g. "Cook the chicken thighs for 6-7 minutes per side until the internal temperature reaches 165°F" or "until juices run clear and the center is no longer pink"). For staples like rice, pasta, and grains, use the standard accurate cook time for that ingredient (white rice ~15-18 min simmered, dried pasta ~8-11 min boiled). If meat needs to rest after cooking, state how long, e.g. "let rest for 5 minutes before slicing."
 
-For each recipe, estimate realistic nutrition PER SERVING (i.e. for one of the ${serveText} servings, not the whole recipe) based on the actual ingredients and quantities in "ingredients": total calories, protein in grams, carbs in grams, fat in grams, and dietary fiber in grams. Use standard nutrition data for common ingredients. These are reasonable estimates, not lab-precision figures, but calories must be internally consistent with the macros — roughly (protein × 4) + (carbs × 4) + (fat × 9), within about 10%. Fiber is a subset of the carb grams already counted, not additional calories.
+For each recipe, calculate nutrition PER SERVING (i.e. for one of the ${serveText} servings, not the whole recipe) using a real ingredient-by-ingredient method — never shortcut straight to a guessed total:
+1. For every entry in "ingredients", recall its standard nutrition profile (USDA FoodData Central-style values per 100g or per common household unit) and compute that ingredient's calorie/protein/carb/fat/fiber contribution based on the EXACT quantity used in this recipe.
+2. Add up every ingredient's contribution, then divide by ${serveText} to get the per-serving total. Actually perform this sum — do not skip to an estimated final number.
+3. Cross-check the result against the Atwater factors: calories should land within about 10% of (protein × 4) + (carbs × 4) + (fat × 9). Fiber is a subset of the carb grams already counted, not additional calories on top.
+4. These are careful, ingredient-grounded estimates, not lab-verified values — accuracy matters, but don't present false precision either.
 
-Respond ONLY with a JSON array, no other text, in this exact shape:
+Respond ONLY with a single-line, compact JSON array — no line breaks or indentation inside the JSON itself, every extra whitespace character is response budget you need for 4 complete recipes. No other text. Exact shape (shown indented below only for readability — your actual response must be compact):
 [
   {
     "title": "Recipe name",
@@ -252,9 +256,15 @@ Respond ONLY with a JSON array, no other text, in this exact shape:
 If a recipe needs nothing extra, "missing" should be an empty array.
 "calories", "proteinG", "carbsG", "fatG", and "fiberG" are per serving and must be positive numbers, not strings or ranges.`;
 
-    const data = await callClaude([{ role: 'user', content: prompt }], 4096);
+    // Raised from 4096: a large/verbose pantry (e.g. long descriptive item
+    // names from the photo-scan flow) plus the 5 macro fields per recipe
+    // pushed 4-recipe responses past the old ceiling often enough to be a
+    // real bug, not an edge case — confirmed via Render logs showing
+    // responses that were valid JSON as far as they went, then just stopped.
+    const data = await callClaude([{ role: 'user', content: prompt }], 8192);
     const textBlock = (data.content || []).find((b) => b.type === 'text');
     if (!textBlock) throw new Error('No text response from model');
+    const truncated = data.stop_reason === 'max_tokens';
 
     let recipes;
     try {
@@ -263,11 +273,20 @@ If a recipe needs nothing extra, "missing" should be an empty array.
       recipes = null;
     }
     if (!Array.isArray(recipes)) {
-      // Most often caused by a heavily diet-incompatible pantry pushing the model to add
-      // explanatory text instead of pure JSON — treat it the same as "no compliant recipes"
-      // rather than surfacing an opaque 500.
-      console.warn('/find-recipes: model response was not a valid recipe array, returning no recipes. Raw response:', String(textBlock.text).slice(0, 500));
-      return res.json({ recipes: [], dietMismatch: dietList.length > 0 });
+      if (truncated) {
+        console.warn(`/find-recipes: response truncated at max_tokens (pantry size: ${pantry.length}), returning no recipes.`);
+      } else {
+        // Most often caused by a heavily diet-incompatible pantry pushing the model to add
+        // explanatory text instead of pure JSON — treat it the same as "no compliant recipes"
+        // rather than surfacing an opaque 500.
+        console.warn('/find-recipes: model response was not a valid recipe array, returning no recipes. Raw response:', String(textBlock.text).slice(0, 500));
+      }
+      // dietMismatch only when diets were actually active; otherwise this was
+      // a generation failure (truncation or a malformed response), which the
+      // client shows a distinct, accurate message for via generationFailed —
+      // "no recipes matched your filters" is simply false when no filters
+      // were even active.
+      return res.json({ recipes: [], dietMismatch: dietList.length > 0, generationFailed: dietList.length === 0 });
     }
 
     const activeDiets = dietList.filter((d) => DIET_BLOCKLISTS[d]);

@@ -72,6 +72,19 @@ export function PantryProvider({ children }) {
     setPantryBusy(false);
   };
 
+  const clearAll = async () => {
+    if (pantryBusy || pantry.length === 0) return;
+    setPantryError('');
+    setPantryBusy(true);
+    const { error: deleteError } = await supabase.from('pantry_items').delete().eq('user_id', userId);
+    if (deleteError) {
+      setPantryError("Couldn't clear your pantry. Check your connection and try again.");
+    } else {
+      setPantry([]);
+    }
+    setPantryBusy(false);
+  };
+
   const pickPhoto = async () => {
     setPhotoError('');
     let timeoutId;
@@ -138,6 +151,7 @@ export function PantryProvider({ children }) {
     photoError,
     addFromText,
     removeItem,
+    clearAll,
     pickPhoto,
   };
 
