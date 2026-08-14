@@ -5,6 +5,7 @@ import { OnboardingNavigator } from './OnboardingNavigator';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
 import { ChangePasswordScreen } from '../screens/settings/ChangePasswordScreen';
 import { DeleteAccountScreen } from '../screens/settings/DeleteAccountScreen';
+import { LogMealScreen } from '../screens/logging/LogMealScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -21,6 +22,11 @@ export function MainStackNavigator() {
       <Stack.Screen
         name="EditTargets"
         component={OnboardingNavigator}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="LogMeal"
+        component={LogMealScreen}
         options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
       />
     </Stack.Navigator>

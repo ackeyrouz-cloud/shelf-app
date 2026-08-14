@@ -132,18 +132,29 @@ export function ProfileScreen({ navigation }) {
         <View style={{ marginTop: 24 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={common.filterTitle}>{isToday ? "Today's meals" : `${dateLabel(selectedDate)}'s meals`}</Text>
-            {!logsLoading && logs.length > 0 && (
-              <View style={dateNavStyles.countPill}>
-                <Text style={dateNavStyles.countPillText}>{logs.length}</Text>
-                <Text style={dateNavStyles.countPillLabel}>LOGGED</Text>
-              </View>
-            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {!logsLoading && logs.length > 0 && (
+                <View style={dateNavStyles.countPill}>
+                  <Text style={dateNavStyles.countPillText}>{logs.length}</Text>
+                  <Text style={dateNavStyles.countPillLabel}>LOGGED</Text>
+                </View>
+              )}
+              <Pressable
+                onPress={() => navigation.navigate('LogMeal')}
+                hitSlop={10}
+                style={dateNavStyles.addBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Log a meal manually"
+              >
+                <Feather name="plus" size={16} color={colors.onFill} />
+              </Pressable>
+            </View>
           </View>
           <View style={{ marginTop: 8 }}>
             {logsLoading ? (
               <ActivityIndicator style={{ marginTop: 14 }} color={colors.primary} />
             ) : logs.length === 0 ? (
-              <Text style={dateNavStyles.emptyNote}>Nothing logged {isToday ? 'yet today' : 'this day'} — log a meal from a recipe's "Log this meal" button.</Text>
+              <Text style={dateNavStyles.emptyNote}>Nothing logged {isToday ? 'yet today' : 'this day'} — log a meal from a recipe's "Log this meal" button, or add one manually with the + above.</Text>
             ) : (
               logs.map((log) => <MealLogEntry key={log.id} log={log} onChanged={fetchLogs} />)
             )}
@@ -177,4 +188,8 @@ function makeDateNavStyles(colors) { return StyleSheet.create({
   },
   countPillText: { fontFamily: FONTS.displaySemiBold, fontSize: 13, color: colors.fat },
   countPillLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5, color: colors.fat },
+  addBtn: {
+    width: 26, height: 26, borderRadius: 9, borderCurve: 'continuous',
+    backgroundColor: colors.fat, alignItems: 'center', justifyContent: 'center',
+  },
 }); }

@@ -10,9 +10,11 @@ export function localDateString(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
-// macros = { calories, proteinG, carbsG, fatG, fiberG } — the exact
-// per-serving values already shown on the recipe, never re-estimated here.
-export async function logMeal({ userId, recipeTitle, servings, macros }) {
+// macros = { calories, proteinG, carbsG, fatG, fiberG } — for recipe logs,
+// the exact per-serving values already shown on the recipe, never
+// re-estimated here. For manual entries, the values the user typed for
+// this one entry, with servings pinned at 1 (see LogMealScreen).
+export async function logMeal({ userId, recipeTitle, servings, macros, source = 'recipe' }) {
   return supabase
     .from('meal_logs')
     .insert({
@@ -25,6 +27,7 @@ export async function logMeal({ userId, recipeTitle, servings, macros }) {
       carbs_g_per_serving: macros.carbsG,
       fat_g_per_serving: macros.fatG,
       fiber_g_per_serving: macros.fiberG ?? null,
+      source,
     })
     .select()
     .single();
