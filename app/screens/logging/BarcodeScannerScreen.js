@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  SafeAreaView, View, Text, Pressable, TextInput, ActivityIndicator, Linking, StyleSheet,
+  SafeAreaView, View, Text, Pressable, TextInput, ActivityIndicator, Linking,
+  Platform, KeyboardAvoidingView, ScrollView, StyleSheet,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect } from '@react-navigation/native';
 import { FONTS } from '../../theme/fonts';
@@ -11,6 +12,50 @@ import { useTheme } from '../../context/ThemeContext';
 import { lookupOffBarcode } from '../../lib/offLookup';
 
 const BARCODE_TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e'];
+
+// Shared between camera mode (floating over the live preview) and manual
+// mode (sitting in normal document flow) so the loading/not-found/error
+// copy and actions stay identical regardless of which mode triggered them.
+function LookupResultCard({ colors, styles, state, onRescan, onSearch }) {
+  if (state === 'loading') {
+    return (
+      <View style={styles.resultCard}>
+        <ActivityIndicator color={colors.primary} />
+        <Text style={styles.resultText}>Looking it up…</Text>
+      </View>
+    );
+  }
+  if (state === 'notFound') {
+    return (
+      <View style={styles.resultCard}>
+        <Feather name="alert-circle" size={22} color={colors.premium} />
+        <Text style={styles.resultText}>That barcode isn't in Open Food Facts' database.</Text>
+        <View style={styles.resultActions}>
+          <Pressable onPress={onRescan} style={styles.resultBtn}>
+            <Text style={styles.resultBtnText}>Try again</Text>
+          </Pressable>
+          <Pressable onPress={onSearch} style={[styles.resultBtn, styles.resultBtnPrimary]}>
+            <Text style={[styles.resultBtnText, styles.resultBtnTextPrimary]}>Search instead</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+  if (state === 'error') {
+    return (
+      <View style={styles.resultCard}>
+        <Feather name="wifi-off" size={22} color={colors.destructive} />
+        <Text style={styles.resultText}>Couldn't look that up. Check your connection.</Text>
+        <View style={styles.resultActions}>
+          <Pressable onPress={onRescan} style={[styles.resultBtn, styles.resultBtnPrimary]}>
+            <Text style={[styles.resultBtnText, styles.resultBtnTextPrimary]}>Try again</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+  return null;
+}
 
 export function BarcodeScannerScreen({ navigation }) {
   const { colors } = useTheme();
@@ -67,6 +112,8 @@ export function BarcodeScannerScreen({ navigation }) {
     handleLookup(trimmed);
   };
 
+  const goToSearch = () => navigation.navigate('FoodSearch');
+
   if (!permission) {
     return (
       <SafeAreaView style={styles.center}>
@@ -102,7 +149,7 @@ export function BarcodeScannerScreen({ navigation }) {
               </Pressable>
             </>
           )}
-          <Pressable onPress={() => navigation.navigate('FoodSearch')} style={{ marginTop: 16 }}>
+          <Pressable onPress={goToSearch} style={{ marginTop: 16 }}>
             <Text style={styles.searchInsteadText}>Search for it instead</Text>
           </Pressable>
         </View>
@@ -110,9 +157,63 @@ export function BarcodeScannerScreen({ navigation }) {
     );
   }
 
+  // Manual entry is a fully separate, normally-themed screen — not the
+  // camera layout with the camera swapped out. Nothing here needs a black
+  // background or an absolutely-positioned overlay, and it needs real
+  // keyboard-avoiding behavior for the text input, matching every other
+  // input screen in the app.
+  if (manualMode) {
+    return (
+      <SafeAreaView style={styles.manualScreen}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={styles.manualScroll} keyboardShouldPersistTaps="handled">
+            <View style={styles.manualHeader}>
+              <Pressable onPress={() => navigation.goBack()} hitSlop={12} accessibilityLabel="Close">
+                <Feather name="x" size={24} color={colors.ink} />
+              </Pressable>
+              <Text style={styles.manualHeaderTitle}>Enter barcode</Text>
+            </View>
+
+            {lookupState === 'idle' ? (
+              <>
+                <View style={styles.manualIconBadge}>
+                  <MaterialCommunityIcons name="barcode-scan" size={28} color={colors.success} />
+                </View>
+                <Text style={styles.manualTitle}>Type the barcode number</Text>
+                <Text style={styles.manualSubtitle}>Usually printed below the barcode lines on the package.</Text>
+                <View style={styles.manualRow}>
+                  <TextInput
+                    style={styles.manualInput}
+                    placeholder="e.g. 0123456789012"
+                    placeholderTextColor={colors.inkMuted}
+                    keyboardType="number-pad"
+                    value={manualCode}
+                    onChangeText={setManualCode}
+                    accessibilityLabel="Barcode number"
+                    autoFocus
+                    onSubmitEditing={submitManual}
+                    returnKeyType="done"
+                  />
+                  <Pressable onPress={submitManual} style={styles.manualSubmit} accessibilityLabel="Look up barcode">
+                    <Feather name="arrow-right" size={18} color={colors.onFill} />
+                  </Pressable>
+                </View>
+                <Pressable onPress={() => setManualMode(false)} style={{ marginTop: 20, alignSelf: 'center' }}>
+                  <Text style={styles.manualToggleLink}>Use camera instead</Text>
+                </Pressable>
+              </>
+            ) : (
+              <LookupResultCard colors={colors} styles={styles} state={lookupState} onRescan={rescan} onSearch={goToSearch} />
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
-      {!manualMode && lookupState === 'idle' && (
+      {lookupState === 'idle' && (
         <CameraView
           style={{ flex: 1 }}
           facing="back"
@@ -126,70 +227,16 @@ export function BarcodeScannerScreen({ navigation }) {
           <Feather name="x" size={24} color="#fff" />
         </Pressable>
 
-        {!manualMode && lookupState === 'idle' && (
+        {lookupState === 'idle' && (
           <View style={styles.scanArea} pointerEvents="none">
             <View style={styles.scanFrame} />
             <Text style={styles.scanHint}>Point your camera at a barcode</Text>
           </View>
         )}
 
-        {lookupState === 'loading' && (
-          <View style={styles.resultCard}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={styles.resultText}>Looking it up…</Text>
-          </View>
-        )}
+        <LookupResultCard colors={colors} styles={styles} state={lookupState} onRescan={rescan} onSearch={goToSearch} />
 
-        {lookupState === 'notFound' && (
-          <View style={styles.resultCard}>
-            <Feather name="alert-circle" size={22} color={colors.premium} />
-            <Text style={styles.resultText}>That barcode isn't in Open Food Facts' database.</Text>
-            <View style={styles.resultActions}>
-              <Pressable onPress={rescan} style={styles.resultBtn}>
-                <Text style={styles.resultBtnText}>Scan again</Text>
-              </Pressable>
-              <Pressable onPress={() => navigation.navigate('FoodSearch')} style={[styles.resultBtn, styles.resultBtnPrimary]}>
-                <Text style={[styles.resultBtnText, styles.resultBtnTextPrimary]}>Search instead</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
-
-        {lookupState === 'error' && (
-          <View style={styles.resultCard}>
-            <Feather name="wifi-off" size={22} color={colors.destructive} />
-            <Text style={styles.resultText}>Couldn't look that up. Check your connection.</Text>
-            <View style={styles.resultActions}>
-              <Pressable onPress={rescan} style={[styles.resultBtn, styles.resultBtnPrimary]}>
-                <Text style={[styles.resultBtnText, styles.resultBtnTextPrimary]}>Try again</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
-
-        {manualMode && lookupState === 'idle' ? (
-          <View style={styles.manualCard}>
-            <Text style={styles.manualLabel}>Enter barcode number</Text>
-            <View style={styles.manualRow}>
-              <TextInput
-                style={styles.manualInput}
-                placeholder="e.g. 0123456789012"
-                placeholderTextColor={colors.inkMuted}
-                keyboardType="number-pad"
-                value={manualCode}
-                onChangeText={setManualCode}
-                accessibilityLabel="Barcode number"
-                autoFocus
-              />
-              <Pressable onPress={submitManual} style={styles.manualSubmit} accessibilityLabel="Look up barcode">
-                <Feather name="arrow-right" size={18} color={colors.onFill} />
-              </Pressable>
-            </View>
-            <Pressable onPress={() => setManualMode(false)}>
-              <Text style={styles.manualToggle}>Use camera instead</Text>
-            </Pressable>
-          </View>
-        ) : lookupState === 'idle' && (
+        {lookupState === 'idle' && (
           <Pressable onPress={() => setManualMode(true)} style={styles.manualToggleWrap}>
             <Text style={styles.manualToggle}>Enter barcode number manually</Text>
           </Pressable>
@@ -226,12 +273,22 @@ function makeStyles(colors) { return StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999,
     overflow: 'hidden',
   },
-  manualCard: {
-    backgroundColor: colors.surface, borderRadius: 20, borderCurve: 'continuous',
-    padding: 18, margin: 16,
+
+  // Manual-entry screen — normal themed layout, not the camera overlay.
+  manualScreen: { flex: 1, backgroundColor: colors.bg },
+  manualScroll: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 40 },
+  manualHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 16, paddingBottom: 8 },
+  manualHeaderTitle: { fontFamily: FONTS.displaySemiBold, fontSize: 19, color: colors.ink },
+  manualIconBadge: {
+    width: 56, height: 56, borderRadius: 18, borderCurve: 'continuous',
+    backgroundColor: `${colors.success}22`, alignItems: 'center', justifyContent: 'center',
+    marginTop: 24, alignSelf: 'center',
   },
-  manualLabel: { fontFamily: FONTS.bodyBold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: colors.inkMuted, marginBottom: 10 },
-  manualRow: { flexDirection: 'row', gap: 8 },
+  manualTitle: { fontFamily: FONTS.displaySemiBold, fontSize: 18, color: colors.ink, textAlign: 'center', marginTop: 16 },
+  manualSubtitle: { fontFamily: FONTS.bodyRegular, fontSize: 13.5, color: colors.inkMuted, textAlign: 'center', marginTop: 6, lineHeight: 19, paddingHorizontal: 12 },
+  manualToggleLink: { fontFamily: FONTS.bodySemiBold, fontSize: 13.5, color: colors.primary },
+
+  manualRow: { flexDirection: 'row', gap: 8, marginTop: 28 },
   manualInput: {
     flex: 1, fontFamily: FONTS.bodyRegular, fontSize: 16, color: colors.ink,
     backgroundColor: colors.surfaceRaised, borderRadius: 14, borderCurve: 'continuous',
@@ -241,9 +298,10 @@ function makeStyles(colors) { return StyleSheet.create({
     width: 48, height: 48, borderRadius: 14, borderCurve: 'continuous',
     backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
   },
+
   resultCard: {
     alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: 20, borderCurve: 'continuous',
-    padding: 22, margin: 16, marginTop: 'auto', marginBottom: 'auto',
+    padding: 22, margin: 16, marginTop: 24,
   },
   resultText: { fontFamily: FONTS.bodySemiBold, fontSize: 14, color: colors.ink, textAlign: 'center' },
   resultActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
