@@ -9,6 +9,7 @@ import { LogMealMethodScreen } from '../screens/logging/LogMealMethodScreen';
 import { LogMealScreen } from '../screens/logging/LogMealScreen';
 import { FoodSearchScreen } from '../screens/logging/FoodSearchScreen';
 import { FoodDetailScreen } from '../screens/logging/FoodDetailScreen';
+import { BarcodeScannerScreen } from '../screens/logging/BarcodeScannerScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -39,6 +40,7 @@ export function MainStackNavigator() {
       <Stack.Screen name="LogMeal" component={LogMealScreen} />
       <Stack.Screen name="FoodSearch" component={FoodSearchScreen} />
       <Stack.Screen name="FoodDetail" component={FoodDetailScreen} />
+      <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
     </Stack.Navigator>
   );
 }

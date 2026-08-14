@@ -19,7 +19,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.yourname.shelf",
       "infoPlist": {
-        "NSCameraUsageDescription": "Shelf uses your camera to identify ingredients on your shelf so you don't have to type them."
+        "NSCameraUsageDescription": "Shelf uses your camera to identify ingredients on your shelf and to scan product barcodes, so you don't have to type them."
       }
     },
     "android": {
@@ -39,7 +39,8 @@
     },
     "plugins": [
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      "expo-camera"
     ]
   }
 }

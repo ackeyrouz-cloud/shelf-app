@@ -1,19 +1,22 @@
 import React, { useMemo } from 'react';
 import { SafeAreaView, View, Text, Pressable, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { FONTS } from '../../theme/fonts';
 import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 
-// Hub for how to log a meal — currently Search and Enter Manually; barcode/
-// voice/photo get added here as their own rows once those are built, rather
-// than each needing their own separate entry point on Profile.
-function MethodRow({ colors, styles, icon, iconColor, label, sublabel, onPress }) {
+const ICON_SETS = { Feather, MaterialCommunityIcons };
+
+// Hub for how to log a meal — Search, Enter Manually, Scan Barcode; voice/
+// photo get added here as their own rows once those are built, rather than
+// each needing their own separate entry point on Profile.
+function MethodRow({ colors, styles, icon, iconFamily = 'Feather', iconColor, label, sublabel, onPress }) {
+  const IconComponent = ICON_SETS[iconFamily];
   const handlePress = () => { Haptics.selectionAsync(); onPress(); };
   return (
     <Pressable onPress={handlePress} style={styles.row}>
       <View style={[styles.rowIcon, { backgroundColor: `${iconColor}22` }]}>
-        <Feather name={icon} size={20} color={iconColor} />
+        <IconComponent name={icon} size={20} color={iconColor} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.rowLabel}>{label}</Text>
@@ -58,6 +61,16 @@ export function LogMealMethodScreen({ navigation }) {
             label="Enter manually"
             sublabel="Type in the nutrition info directly"
             onPress={() => navigation.navigate('LogMeal')}
+          />
+          <MethodRow
+            colors={colors}
+            styles={styles}
+            icon="barcode-scan"
+            iconFamily="MaterialCommunityIcons"
+            iconColor={colors.success}
+            label="Scan barcode"
+            sublabel="Scan a product's barcode to log it"
+            onPress={() => navigation.navigate('BarcodeScanner')}
           />
         </View>
       </View>
