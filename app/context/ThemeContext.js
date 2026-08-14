@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { Appearance } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DARK_COLORS, LIGHT_COLORS } from '../theme/colors';
 import { makeCommonStyles } from '../theme/common';
@@ -20,6 +21,14 @@ export function ThemeProvider({ children }) {
       if (stored === 'light' || stored === 'dark') setMode(stored);
     })();
   }, []);
+
+  // Ties native chrome (keyboard appearance, alerts/action sheets, date
+  // pickers) to the app's own toggle rather than the device's system
+  // setting — app.json's userInterfaceStyle is left as "automatic" so this
+  // runtime override isn't fighting a hardcoded native declaration.
+  useEffect(() => {
+    Appearance.setColorScheme(mode);
+  }, [mode]);
 
   const setThemeMode = (next) => {
     setMode(next);
