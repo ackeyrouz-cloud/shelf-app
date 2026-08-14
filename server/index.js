@@ -575,7 +575,10 @@ If (and only if) you genuinely cannot estimate at all:
 
     const data = await callClaude([{ role: 'user', content: prompt }], 500);
     const textBlock = (data.content || []).find((b) => b.type === 'text');
-    if (!textBlock) throw new Error('No text response from model');
+    if (!textBlock) {
+      console.error('/estimate-meal: no text block in response. stop_reason:', data.stop_reason, '| content:', JSON.stringify(data.content).slice(0, 500));
+      throw new Error('No text response from model');
+    }
 
     let parsed;
     try {
