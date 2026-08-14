@@ -62,13 +62,17 @@ export function RecipesScreen() {
     setError('');
     setRecipes([]);
     setLoading(true);
-    // Generation now realistically takes up to ~60-90s for 6 detailed
-    // recipes with full nutrition — a static "Looking…" that never changes
-    // reads as broken well before the real (now much longer) timeout fires.
+    // Generation realistically takes up to ~90s+ for a large pantry with 5
+    // detailed recipes and full nutrition (measured, not guessed) — a static
+    // "Looking…" that never changes reads as broken well before the real
+    // timeout fires. Deliberately doesn't say "almost there" until genuinely
+    // late, since the wait can run past a minute and a premature "almost
+    // there" held for 40+ seconds reads as dishonest, not reassuring.
     setLoadingMessage("Looking through what you've got…");
     loadingTimers.current.push(
       setTimeout(() => setLoadingMessage('Still working — writing out full recipes and nutrition info can take a moment…'), 10000),
-      setTimeout(() => setLoadingMessage('Almost there — hang tight for a few more seconds…'), 30000),
+      setTimeout(() => setLoadingMessage('Detailed recipes with full nutrition take a little longer, especially with a large pantry…'), 30000),
+      setTimeout(() => setLoadingMessage("Almost there — this one's taking longer than usual…"), 70000),
     );
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

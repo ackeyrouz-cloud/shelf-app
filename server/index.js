@@ -15,11 +15,12 @@ app.use(express.json({ limit: '10mb' }));
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-5';
-// Raised from 4: reliability was the higher priority (see ANTHROPIC_TIMEOUT_MS
-// below), so this moved up moderately, not all the way to 8, to keep
-// generation time growth proportional and comfortably inside the new timeout
-// rather than trading one reliability problem for another.
-const RECIPE_COUNT = 6;
+// Raised from 4, pulled back from an initial 6 after a real timed test: a
+// realistic large pantry (14 items) at 6 recipes measured 94s end-to-end —
+// too close to even the raised timeout below to call "reliable," not a
+// hypothetical concern. 5 is the actual reliability/variety balance point,
+// not a guess.
+const RECIPE_COUNT = 5;
 
 // Same project the app itself talks to (app/lib/supabase.js) — URL and anon
 // key are not secret, they're already embedded in the client bundle. The
@@ -48,10 +49,12 @@ if (!SUPABASE_SERVICE_ROLE_KEY) {
 // instead of leaving the app looking hung. Raised from 45s to 100s after confirming via
 // Render logs that the 45s ceiling itself was the failure — real DOMException[TimeoutError]
 // entries from this exact AbortSignal, meaning generation was routinely taking ~45s+ and
-// getting killed before it could finish, not a genuinely stuck/hung request. That 45s figure
-// was calibrated before ingredient-by-ingredient nutrition reasoning and 6-recipe variety
-// requirements were added to the prompt, both of which meaningfully lengthen generation.
-const ANTHROPIC_TIMEOUT_MS = 100000;
+// getting killed before it could finish, not a genuinely stuck/hung request. Raised again to
+// 130s after a real timed test of a large (14-item) pantry measured 94s end-to-end at
+// RECIPE_COUNT=6 — 100s left too little margin to call reliable. That same 94s test also
+// completed without Render's own infrastructure cutting the connection first, which is the
+// actual evidence this higher ceiling is safe to use, not just a bigger guess.
+const ANTHROPIC_TIMEOUT_MS = 130000;
 
 if (!ANTHROPIC_API_KEY) {
   console.warn('WARNING: ANTHROPIC_API_KEY is not set. Requests will fail.');
@@ -279,7 +282,9 @@ If a recipe needs nothing extra, "missing" should be an empty array.
     // fields per recipe pushed 4-recipe responses past the old ceiling often
     // enough to be a real bug, not an edge case — confirmed via Render logs
     // showing responses that were valid JSON as far as they went, then just
-    // stopped. Scaled up again in proportion to RECIPE_COUNT's 4->6 increase.
+    // stopped. Left at 12288 even after RECIPE_COUNT dropped 6->5: this is a
+    // ceiling, not a target — extra headroom against truncation costs
+    // nothing unless the model actually needs it.
     const data = await callClaude([{ role: 'user', content: prompt }], 12288);
     const textBlock = (data.content || []).find((b) => b.type === 'text');
     if (!textBlock) throw new Error('No text response from model');
