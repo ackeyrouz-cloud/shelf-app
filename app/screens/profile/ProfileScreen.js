@@ -146,7 +146,7 @@ export function ProfileScreen({ navigation }) {
                 accessibilityRole="button"
                 accessibilityLabel="Log a meal"
               >
-                <Feather name="plus" size={16} color={colors.onFill} />
+                <Feather name="plus" size={20} color={colors.onFill} />
               </Pressable>
             </View>
           </View>
@@ -189,7 +189,8 @@ function makeDateNavStyles(colors) { return StyleSheet.create({
   countPillText: { fontFamily: FONTS.displaySemiBold, fontSize: 13, color: colors.fat },
   countPillLabel: { fontFamily: FONTS.bodyBold, fontSize: 9, letterSpacing: 0.5, color: colors.fat },
   addBtn: {
-    width: 26, height: 26, borderRadius: 9, borderCurve: 'continuous',
+    width: 36, height: 36, borderRadius: 12, borderCurve: 'continuous',
     backgroundColor: colors.fat, alignItems: 'center', justifyContent: 'center',
+    boxShadow: `0 3px 8px ${colors.fat}55`,
   },
 }); }
