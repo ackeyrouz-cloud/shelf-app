@@ -661,13 +661,16 @@ If you can identify the food(s) clearly enough to make a reasonable estimate, ca
 4. Cross-check: calories should land within about 10% of (protein × 4) + (carbs × 4) + (fat × 9). Fiber is a subset of carb grams, not additional calories.
 5. Report your best estimate of the total weight in grams for the portion shown.
 
-Respond ONLY with compact JSON, no other text, in exactly one of these two shapes:
+Respond ONLY with compact JSON, no other text, in exactly one of these three shapes:
 
 If you can produce a reasonable estimate:
 {"canEstimate":true,"name":"Grilled Chicken with Rice","caloriesPer100":165,"proteinPer100":18,"carbsPer100":12,"fatPer100":4,"fiberPer100":1,"estimatedGrams":400,"isBeverage":false}
 
-If the photo doesn't show food clearly enough to estimate at all (blurry, not food, too obscured):
-{"canEstimate":false}
+If the photo clearly does not show food at all (a person, an object, a screen, anything non-edible):
+{"canEstimate":false,"notFood":true}
+
+If the photo does show food, but it's too blurry, dark, obscured, or far away to estimate with any confidence:
+{"canEstimate":false,"notFood":false}
 
 "name" should be a clean, short name for what's shown. "isBeverage" should be true only for actual drinks. All numeric fields are required and must be positive numbers when canEstimate is true.`;
 
@@ -700,14 +703,16 @@ If the photo doesn't show food clearly enough to estimate at all (blurry, not fo
     }
 
     if (!parsed.canEstimate) {
-      return res.json({ canEstimate: false });
+      return res.json({ canEstimate: false, notFood: !!parsed.notFood });
     }
 
     const calories = Number(parsed.caloriesPer100);
     const grams = Number(parsed.estimatedGrams);
     if (!Number.isFinite(calories) || calories <= 0 || !Number.isFinite(grams) || grams <= 0) {
       console.warn('/estimate-meal-photo: model returned an incomplete estimate. Raw response:', String(textBlock.text).slice(0, 500));
-      return res.json({ canEstimate: false });
+      // Malformed rather than a clean "not food" refusal — closer to "food,
+      // but couldn't be estimated" than a confident not-food judgment.
+      return res.json({ canEstimate: false, notFood: false });
     }
 
     res.json({

@@ -23,12 +23,16 @@ export function PhotoMealScreen({ navigation }) {
   const [photo, setPhoto] = useState(null); // { uri, base64 }
   const [caption, setCaption] = useState('');
   const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
+  // null | 'notFood' | 'unclear' — distinguishes "that's clearly not food"
+  // from "it's food, but too blurry/dark/far to estimate", matching the
+  // pantry photo-scan feature's notFood pattern, since those call for
+  // different messages, not one generic failure state.
+  const [failed, setFailed] = useState(null);
   const [error, setError] = useState('');
 
   const takePhoto = async () => {
     setError('');
-    setFailed(false);
+    setFailed(null);
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) {
       setError('Enable camera access in Settings to photograph a meal.');
@@ -43,14 +47,14 @@ export function PhotoMealScreen({ navigation }) {
   const retake = () => {
     setPhoto(null);
     setCaption('');
-    setFailed(false);
+    setFailed(null);
     setError('');
   };
 
   const submit = async () => {
     if (!photo) return;
     setError('');
-    setFailed(false);
+    setFailed(null);
     setLoading(true);
     const result = await estimateMealPhoto(photo.base64, 'image/jpeg', caption);
     setLoading(false);
@@ -65,7 +69,7 @@ export function PhotoMealScreen({ navigation }) {
     }
     if (!result.canEstimate) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      setFailed(true);
+      setFailed(result.notFood ? 'notFood' : 'unclear');
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -128,7 +132,9 @@ export function PhotoMealScreen({ navigation }) {
             <View style={[common.card, { marginTop: 14, alignItems: 'center' }]}>
               <Feather name="alert-circle" size={22} color={colors.premium} />
               <Text style={[common.tagline, { marginTop: 8, textAlign: 'center' }]}>
-                Couldn't get a clear enough read on that photo to estimate.
+                {failed === 'notFood'
+                  ? "That doesn't look like food — try another photo or use a different logging method."
+                  : "Couldn't get a clear enough read on that photo to estimate — try a closer, brighter shot."}
               </Text>
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
                 <Pressable onPress={retake} style={{
