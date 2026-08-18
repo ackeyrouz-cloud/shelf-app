@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 import { supabase } from '../lib/supabase';
@@ -18,6 +18,14 @@ export function PantryProvider({ children }) {
   const [photoLoading, setPhotoLoading] = useState(false);
   const [photoError, setPhotoError] = useState('');
 
+  const fetchPantry = useCallback(async () => {
+    const { data, error: fetchError } = await supabase
+      .from('pantry_items')
+      .select('id, name')
+      .order('created_at', { ascending: true });
+    return { data, fetchError };
+  }, []);
+
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
@@ -25,10 +33,7 @@ export function PantryProvider({ children }) {
     setPantryError('');
     setPantryLoading(true);
     (async () => {
-      const { data, error: fetchError } = await supabase
-        .from('pantry_items')
-        .select('id, name')
-        .order('created_at', { ascending: true });
+      const { data, fetchError } = await fetchPantry();
       if (cancelled) return;
       if (fetchError) {
         setPantryError("Couldn't load your pantry. Check your connection and try again.");
@@ -38,7 +43,20 @@ export function PantryProvider({ children }) {
       setPantryLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, fetchPantry]);
+
+  // For pull-to-refresh — deliberately doesn't touch pantryLoading (that's
+  // the full-screen initial-load spinner); RefreshControl already shows its
+  // own indicator for a manual refresh.
+  const reloadPantry = async () => {
+    setPantryError('');
+    const { data, fetchError } = await fetchPantry();
+    if (fetchError) {
+      setPantryError("Couldn't load your pantry. Check your connection and try again.");
+    } else {
+      setPantry(data || []);
+    }
+  };
 
   const addFromText = async (inputText) => {
     if (!inputText.trim() || pantryBusy) return;
@@ -153,6 +171,7 @@ export function PantryProvider({ children }) {
     removeItem,
     clearAll,
     pickPhoto,
+    reloadPantry,
   };
 
   return <PantryContext.Provider value={value}>{children}</PantryContext.Provider>;

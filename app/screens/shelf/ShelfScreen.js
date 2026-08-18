@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   SafeAreaView, ScrollView, View, Text, TextInput, Pressable,
-  StyleSheet, ActivityIndicator, Platform, KeyboardAvoidingView, Alert,
+  StyleSheet, ActivityIndicator, Platform, KeyboardAvoidingView, Alert, RefreshControl,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -10,11 +10,18 @@ import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 import { usePantry } from '../../context/PantryContext';
 
 export function ShelfScreen() {
-  const { pantry, pantryLoading, pantryBusy, pantryError, photoLoading, photoError, addFromText, removeItem, clearAll, pickPhoto } = usePantry();
+  const { pantry, pantryLoading, pantryBusy, pantryError, photoLoading, photoError, addFromText, removeItem, clearAll, pickPhoto, reloadPantry } = usePantry();
   const { colors } = useTheme();
   const common = useCommonStyles();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [inputText, setInputText] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await reloadPantry();
+    setRefreshing(false);
+  };
 
   const submitText = () => {
     Haptics.selectionAsync();
@@ -47,7 +54,13 @@ export function ShelfScreen() {
   return (
     <SafeAreaView style={common.safe}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={common.wrap} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={common.wrap}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+          }
+        >
 
           <View style={common.header}>
             <View style={styles.headerRow}>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SafeAreaView, ScrollView, View, Text, TextInput, Pressable, Alert, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaView, ScrollView, View, Text, TextInput, Pressable, Alert, ActivityIndicator, StyleSheet, RefreshControl } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
@@ -46,6 +46,7 @@ export function ProfileScreen({ navigation }) {
   const [customWaterText, setCustomWaterText] = useState('');
 
   const [streak, setStreak] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Restrained target-hit celebration: a haptic + a brief scale pulse on
   // the ring/bar itself, once per (metric, day) — not confetti, not a
@@ -107,6 +108,12 @@ export function ProfileScreen({ navigation }) {
       fetchStreak();
     }, [fetchLogs, fetchWater, fetchStreak]),
   );
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchLogs(), fetchWater(), fetchStreak()]);
+    setRefreshing(false);
+  };
 
   const applyWaterAdd = async (ml) => {
     Haptics.selectionAsync();
@@ -184,7 +191,12 @@ export function ProfileScreen({ navigation }) {
 
   return (
     <SafeAreaView style={common.safe}>
-      <ScrollView contentContainerStyle={common.wrap}>
+      <ScrollView
+        contentContainerStyle={common.wrap}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.fat} colors={[colors.fat]} />
+        }
+      >
         <View style={common.header}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={dateNavStyles.headerRow}>
