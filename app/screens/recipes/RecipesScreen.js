@@ -3,6 +3,7 @@ import {
   SafeAreaView, ScrollView, View, Text, TextInput,
   ActivityIndicator, Platform, KeyboardAvoidingView,
 } from 'react-native';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 import { FilterBlock } from '../../components/FilterBlock';
 import { ChipRow, MultiChipRow } from '../../components/ChipRow';
@@ -166,13 +167,14 @@ export function RecipesScreen() {
 
           <View style={{ marginTop: 20 }}>
             {recipes.map((r, i) => (
-              <RecipeCard
-                key={`${r.title}-${i}`}
-                recipe={r}
-                servings={recipeServings}
-                open={openIndex === i}
-                onToggle={() => setOpenIndex(openIndex === i ? null : i)}
-              />
+              <Animated.View key={`${r.title}-${i}`} entering={FadeInUp.delay(i * 80).duration(320)}>
+                <RecipeCard
+                  recipe={r}
+                  servings={recipeServings}
+                  open={openIndex === i}
+                  onToggle={() => setOpenIndex(openIndex === i ? null : i)}
+                />
+              </Animated.View>
             ))}
           </View>
         </ScrollView>

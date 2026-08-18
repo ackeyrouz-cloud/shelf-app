@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { useAnimatedProps, useSharedValue, withTiming, interpolateColor } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { FONTS } from '../theme/fonts';
 import { useTheme } from '../context/ThemeContext';
@@ -11,6 +12,23 @@ import { RecipesScreen } from '../screens/recipes/RecipesScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
+const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
+
+// The outline->filled glyph swap is still a hard cut (there's no
+// interpolating between two different icon shapes) — only the color
+// cross-fades. That alone reads as noticeably smoother than the instant
+// color snap it replaces, without needing a custom icon set to animate the
+// shape too.
+function TabIcon({ focused, activeIcon, inactiveIcon, activeColor, inactiveColor }) {
+  const progress = useSharedValue(focused ? 1 : 0);
+  useEffect(() => {
+    progress.value = withTiming(focused ? 1 : 0, { duration: 200 });
+  }, [focused]);
+  const animatedProps = useAnimatedProps(() => ({
+    color: interpolateColor(progress.value, [0, 1], [inactiveColor, activeColor]),
+  }));
+  return <AnimatedIonicons name={focused ? activeIcon : inactiveIcon} size={24} animatedProps={animatedProps} />;
+}
 
 // Each tab gets its own color identity (Liftoff-style) rather than one
 // accent for every active state, and swaps to a filled glyph when active
@@ -54,10 +72,12 @@ function CustomTabBar({ state, descriptors, navigation }) {
             accessibilityState={{ selected: focused }}
             accessibilityLabel={label}
           >
-            <Ionicons
-              name={focused ? config.icon : config.iconOutline}
-              size={24}
-              color={focused ? config.color : colors.inkMuted}
+            <TabIcon
+              focused={focused}
+              activeIcon={config.icon}
+              inactiveIcon={config.iconOutline}
+              activeColor={config.color}
+              inactiveColor={colors.inkMuted}
             />
             <Text style={[styles.label, focused && { color: config.color, fontFamily: FONTS.bodyBold }]}>{label}</Text>
           </Pressable>

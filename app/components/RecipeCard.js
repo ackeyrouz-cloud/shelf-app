@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withTiming, Easing, LinearTransition, FadeIn, FadeOut,
+  useSharedValue, useAnimatedStyle, withTiming, Easing, LinearTransition, FadeIn, FadeOut, ZoomIn,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { FONTS } from '../theme/fonts';
@@ -16,6 +16,12 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 // per card would still animate correctly, but wastes allocations across a
 // list of 5 cards for identical timing.
 const CARD_LAYOUT_TRANSITION = LinearTransition.duration(260).easing(Easing.out(Easing.cubic));
+// A small delayed pop on the "Ready now" badge specifically — delayed past
+// the card's own staggered fade-in (RecipesScreen) so it reads as a
+// distinct second beat, not simultaneous motion. Only applied to the
+// positive "ready" state, not "needs items" — restrained, one beat, not a
+// celebration on every card.
+const READY_BADGE_ENTRANCE = ZoomIn.delay(450).duration(280).springify().damping(12);
 
 export function RecipeCard({ recipe, servings, open, onToggle }) {
   const { colors } = useTheme();
@@ -54,11 +60,14 @@ export function RecipeCard({ recipe, servings, open, onToggle }) {
           <Text style={styles.recipeTitle}>{recipe.title}</Text>
           <Text style={styles.recipeMeta}>{recipe.time} · {recipe.difficulty} · Serves {servings}</Text>
         </View>
-        <View style={[styles.matchBadge, { backgroundColor: matchColor }]}>
+        <Animated.View
+          entering={ready ? READY_BADGE_ENTRANCE : undefined}
+          style={[styles.matchBadge, { backgroundColor: matchColor }]}
+        >
           <Text style={styles.matchBadgeText}>
             {ready ? 'Ready now' : `Needs ${missing.length} item${missing.length > 1 ? 's' : ''}`}
           </Text>
-        </View>
+        </Animated.View>
       </View>
 
       {totalRelevant > 0 && (
