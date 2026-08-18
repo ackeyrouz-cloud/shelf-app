@@ -20,6 +20,7 @@ export function TargetsReviewScreen({ navigation }) {
     carbsInput, setCarbsInput,
     fatInput, setFatInput,
     fiberInput, setFiberInput,
+    waterInput, setWaterInput, waterUnitLabel,
     saving, saveError, save,
   } = useOnboarding();
   const { colors } = useTheme();
@@ -84,6 +85,11 @@ export function TargetsReviewScreen({ navigation }) {
             <FilterBlock title="Fiber (g)" style={{ marginTop: 16 }}>
               <TextInput style={common.input} keyboardType="number-pad" value={fiberInput} onChangeText={setFiberInput} accessibilityLabel="Fiber in grams" />
             </FilterBlock>
+            {isEditingExisting && (
+              <FilterBlock title={`Daily water goal (${waterUnitLabel})`} style={{ marginTop: 16 }}>
+                <TextInput style={common.input} keyboardType="number-pad" value={waterInput} onChangeText={setWaterInput} accessibilityLabel={`Daily water goal in ${waterUnitLabel}`} />
+              </FilterBlock>
+            )}
           </View>
 
           <PrimaryButton label={saving ? 'Saving…' : isEditingExisting ? 'Save targets' : 'Save and continue'} onPress={handleSave} disabled={saving} />

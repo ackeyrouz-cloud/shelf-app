@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { calculateTargets } from '../lib/targets';
+import { getWaterUnitSystem, mlToDisplay, displayToMl, displayUnitLabel } from '../lib/water';
 import { useAuth } from './AuthContext';
 import { useProfile } from './ProfileContext';
 
@@ -40,6 +41,14 @@ export function OnboardingProvider({ children }) {
   const [fatInput, setFatInput] = useState('');
   const [fiberInput, setFiberInput] = useState('');
 
+  // Water goal is only editable from Settings (isEditingExisting), never
+  // shown during first-time onboarding — but it's still part of every save,
+  // seeded here so a first-time save writes a sensible default rather than
+  // needing a special case.
+  const waterUnitSystem = useMemo(() => getWaterUnitSystem(), []);
+  const waterUnitLabel = displayUnitLabel(waterUnitSystem);
+  const [waterInput, setWaterInput] = useState(() => String(Math.round(mlToDisplay(profile?.target_water_ml ?? 2000, waterUnitSystem))));
+
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
@@ -73,6 +82,11 @@ export function OnboardingProvider({ children }) {
       setSaveError('Enter valid numbers for all targets.');
       return false;
     }
+    const finalWaterMl = displayToMl(parseFloat(waterInput), waterUnitSystem);
+    if (!(finalWaterMl > 0)) {
+      setSaveError('Enter a valid water goal.');
+      return false;
+    }
     setSaveError('');
     setSaving(true);
     const { data, error: saveErr } = await supabase
@@ -92,6 +106,7 @@ export function OnboardingProvider({ children }) {
         target_carbs_g: finalCarbs,
         target_fat_g: finalFat,
         target_fiber_g: finalFiber,
+        target_water_ml: finalWaterMl,
       })
       .select()
       .single();
@@ -120,6 +135,7 @@ export function OnboardingProvider({ children }) {
     carbsInput, setCarbsInput,
     fatInput, setFatInput,
     fiberInput, setFiberInput,
+    waterInput, setWaterInput, waterUnitLabel,
     seedInputsFromCalculated,
     saving, saveError,
     save,

@@ -25,6 +25,11 @@ export const DARK_COLORS = {
 
   destructive: '#F87171',
 
+  // Water — sky blue, deliberately distinct from primary's blue (the
+  // calorie ring already uses primary) and from carbs' teal, so water
+  // reads as its own thing next to both on the Profile dashboard.
+  water: '#38BDF8',
+
   // Primary/success/premium/macro fills are all light-ish saturated tones,
   // so text/icons painted on top of a solid fill need a dark foreground
   // rather than `ink`, which is light in this theme.
@@ -54,6 +59,8 @@ export const LIGHT_COLORS = {
   fiber: '#65A30D',
 
   destructive: '#DC2626',
+
+  water: '#0284C7',
 
   // Fills are now the darker, saturated element, so foreground text/icons
   // painted on top need to be white rather than `ink`.

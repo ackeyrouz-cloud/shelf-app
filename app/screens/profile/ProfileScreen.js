@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { SafeAreaView, ScrollView, View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaView, ScrollView, View, Text, TextInput, Pressable, Alert, ActivityIndicator, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
@@ -10,6 +10,10 @@ import { NutrientProgressBar } from '../../components/NutrientProgressBar';
 import { MealLogEntry } from '../../components/MealLogEntry';
 import { useProfile } from '../../context/ProfileContext';
 import { getMealLogsForDate, localDateString } from '../../lib/mealLogs';
+import {
+  getWaterUnitSystem, quickAddAmounts, mlToDisplay, displayToMl, displayUnitLabel,
+  getWaterForDate, addWater, resetWaterForDate,
+} from '../../lib/water';
 
 function addDays(date, delta) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + delta);
@@ -33,8 +37,17 @@ export function ProfileScreen({ navigation }) {
   const [logsLoading, setLogsLoading] = useState(true);
   const [logsError, setLogsError] = useState('');
 
+  const [waterMl, setWaterMl] = useState(0);
+  const [waterLoading, setWaterLoading] = useState(true);
+  const [waterBusy, setWaterBusy] = useState(false);
+  const [customWaterOpen, setCustomWaterOpen] = useState(false);
+  const [customWaterText, setCustomWaterText] = useState('');
+
   const hasTargets = profile?.target_calories != null;
   const isToday = localDateString(selectedDate) === localDateString(new Date());
+  const unitSystem = useMemo(() => getWaterUnitSystem(), []);
+  const waterQuickAdds = useMemo(() => quickAddAmounts(unitSystem), [unitSystem]);
+  const waterTargetMl = profile?.target_water_ml ?? 2000;
 
   const fetchLogs = useCallback(async () => {
     setLogsLoading(true);
@@ -49,6 +62,14 @@ export function ProfileScreen({ navigation }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate.getTime()]);
 
+  const fetchWater = useCallback(async () => {
+    setWaterLoading(true);
+    const { amountMl } = await getWaterForDate(selectedDate);
+    setWaterMl(amountMl);
+    setWaterLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate.getTime()]);
+
   // Refetches both on tab focus (e.g. after logging a meal from Recipes)
   // and whenever selectedDate changes, since react-navigation calls the
   // effect immediately on identity change while already focused, not just
@@ -58,8 +79,53 @@ export function ProfileScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       fetchLogs();
-    }, [fetchLogs]),
+      fetchWater();
+    }, [fetchLogs, fetchWater]),
   );
+
+  const applyWaterAdd = async (ml) => {
+    Haptics.selectionAsync();
+    setWaterBusy(true);
+    const { amountMl, error } = await addWater(ml, selectedDate);
+    setWaterBusy(false);
+    if (error) {
+      Alert.alert("Couldn't log that", 'Check your connection and try again.');
+      return;
+    }
+    setWaterMl(amountMl);
+    if (amountMl >= waterTargetMl && amountMl - ml < waterTargetMl) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  };
+
+  const submitCustomWater = () => {
+    const amount = parseFloat(customWaterText);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    setCustomWaterOpen(false);
+    setCustomWaterText('');
+    applyWaterAdd(displayToMl(amount, unitSystem));
+  };
+
+  const confirmResetWater = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert(
+      "Reset today's water?",
+      'This clears today\'s water total back to 0.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            setWaterBusy(true);
+            await resetWaterForDate(selectedDate);
+            setWaterMl(0);
+            setWaterBusy(false);
+          },
+        },
+      ],
+    );
+  };
 
   const totals = useMemo(() => logs.reduce((acc, log) => {
     const s = log.servings_logged;
@@ -129,6 +195,83 @@ export function ProfileScreen({ navigation }) {
           </>
         )}
 
+        <View style={[common.card, { marginTop: 14 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={dateNavStyles.waterIcon}>
+                <Feather name="droplet" size={13} color={colors.water} />
+              </View>
+              <Text style={dateNavStyles.waterLabel}>Water</Text>
+            </View>
+            {isToday && waterMl > 0 && (
+              <Pressable onPress={confirmResetWater} disabled={waterBusy} hitSlop={10}>
+                <Text style={dateNavStyles.waterResetText}>Reset</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {waterLoading ? (
+            <ActivityIndicator style={{ marginTop: 14 }} color={colors.water} />
+          ) : (
+            <>
+              <View style={{ marginTop: 4 }}>
+                <NutrientProgressBar
+                  label="Today"
+                  consumed={mlToDisplay(waterMl, unitSystem)}
+                  target={mlToDisplay(waterTargetMl, unitSystem)}
+                  unit={unitSystem === 'imperial' ? ' fl oz' : 'ml'}
+                  color={colors.water}
+                />
+              </View>
+
+              {isToday && (
+                <View style={{ marginTop: 4 }}>
+                  <View style={dateNavStyles.waterPillRow}>
+                    {waterQuickAdds.map((opt) => (
+                      <Pressable
+                        key={opt.label}
+                        onPress={() => applyWaterAdd(opt.ml)}
+                        disabled={waterBusy}
+                        style={[dateNavStyles.waterPill, waterBusy && { opacity: 0.5 }]}
+                      >
+                        <Feather name="plus" size={12} color={colors.water} />
+                        <Text style={dateNavStyles.waterPillText}>{opt.label}</Text>
+                      </Pressable>
+                    ))}
+                    <Pressable
+                      onPress={() => setCustomWaterOpen((v) => !v)}
+                      disabled={waterBusy}
+                      style={[dateNavStyles.waterPill, customWaterOpen && { backgroundColor: `${colors.water}33` }]}
+                    >
+                      <Text style={dateNavStyles.waterPillText}>Custom</Text>
+                    </Pressable>
+                  </View>
+
+                  {customWaterOpen && (
+                    <View style={dateNavStyles.waterCustomRow}>
+                      <TextInput
+                        style={[common.input, { flex: 1 }]}
+                        placeholder={displayUnitLabel(unitSystem)}
+                        placeholderTextColor={colors.inkMuted}
+                        keyboardType="decimal-pad"
+                        value={customWaterText}
+                        onChangeText={setCustomWaterText}
+                        autoFocus
+                        onSubmitEditing={submitCustomWater}
+                        returnKeyType="done"
+                        accessibilityLabel={`Custom water amount in ${displayUnitLabel(unitSystem)}`}
+                      />
+                      <Pressable onPress={submitCustomWater} style={dateNavStyles.waterCustomSubmit} accessibilityLabel="Add custom amount">
+                        <Feather name="check" size={18} color={colors.onFill} />
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              )}
+            </>
+          )}
+        </View>
+
         <View style={{ marginTop: 24 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={common.filterTitle}>{isToday ? "Today's meals" : `${dateLabel(selectedDate)}'s meals`}</Text>
@@ -192,5 +335,23 @@ function makeDateNavStyles(colors) { return StyleSheet.create({
     width: 36, height: 36, borderRadius: 12, borderCurve: 'continuous',
     backgroundColor: colors.fat, alignItems: 'center', justifyContent: 'center',
     boxShadow: `0 3px 8px ${colors.fat}55`,
+  },
+  waterIcon: {
+    width: 22, height: 22, borderRadius: 8, borderCurve: 'continuous',
+    backgroundColor: `${colors.water}22`, alignItems: 'center', justifyContent: 'center',
+  },
+  waterLabel: { fontFamily: FONTS.bodyBold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: colors.inkMuted },
+  waterResetText: { fontFamily: FONTS.bodySemiBold, fontSize: 12.5, color: colors.destructive },
+  waterPillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
+  waterPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 36,
+    borderRadius: 999, borderCurve: 'continuous', backgroundColor: `${colors.water}18`,
+    paddingHorizontal: 13,
+  },
+  waterPillText: { fontFamily: FONTS.bodyBold, fontSize: 12.5, color: colors.water },
+  waterCustomRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  waterCustomSubmit: {
+    width: 48, height: 48, borderRadius: 14, borderCurve: 'continuous',
+    backgroundColor: colors.water, alignItems: 'center', justifyContent: 'center',
   },
 }); }
