@@ -1,6 +1,7 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView, ScrollView, View, Text, TextInput, Pressable, Alert, ActivityIndicator, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import { FONTS } from '../../theme/fonts';
@@ -14,6 +15,7 @@ import {
   getWaterUnitSystem, quickAddAmounts, mlToDisplay, displayToMl, displayUnitLabel,
   getWaterForDate, addWater, resetWaterForDate,
 } from '../../lib/water';
+import { getLoggingStreak } from '../../lib/streak';
 
 function addDays(date, delta) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + delta);
@@ -43,6 +45,21 @@ export function ProfileScreen({ navigation }) {
   const [customWaterOpen, setCustomWaterOpen] = useState(false);
   const [customWaterText, setCustomWaterText] = useState('');
 
+  const [streak, setStreak] = useState(0);
+
+  // Restrained target-hit celebration: a haptic + a brief scale pulse on
+  // the ring/bar itself, once per (metric, day) — not confetti, not a
+  // full-screen takeover. Each ref holds the date string it was last
+  // celebrated for for that metric, so "already celebrated today" survives
+  // re-renders/refocuses without needing to persist anything, and a new
+  // day (a different date string) naturally allows it to fire again.
+  const caloriesCelebratedForRef = useRef(null);
+  const waterCelebratedForRef = useRef(null);
+  const caloriesPulse = useSharedValue(1);
+  const waterPulse = useSharedValue(1);
+  const caloriesPulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: caloriesPulse.value }] }));
+  const waterPulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: waterPulse.value }] }));
+
   const hasTargets = profile?.target_calories != null;
   const isToday = localDateString(selectedDate) === localDateString(new Date());
   const unitSystem = useMemo(() => getWaterUnitSystem(), []);
@@ -70,6 +87,13 @@ export function ProfileScreen({ navigation }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate.getTime()]);
 
+  // The streak reflects real-world "today", not whichever day is currently
+  // selected in the date-nav — refetched on focus only, not on date change.
+  const fetchStreak = useCallback(async () => {
+    const { streak: value } = await getLoggingStreak();
+    setStreak(value);
+  }, []);
+
   // Refetches both on tab focus (e.g. after logging a meal from Recipes)
   // and whenever selectedDate changes, since react-navigation calls the
   // effect immediately on identity change while already focused, not just
@@ -80,7 +104,8 @@ export function ProfileScreen({ navigation }) {
     useCallback(() => {
       fetchLogs();
       fetchWater();
-    }, [fetchLogs, fetchWater]),
+      fetchStreak();
+    }, [fetchLogs, fetchWater, fetchStreak]),
   );
 
   const applyWaterAdd = async (ml) => {
@@ -93,9 +118,6 @@ export function ProfileScreen({ navigation }) {
       return;
     }
     setWaterMl(amountMl);
-    if (amountMl >= waterTargetMl && amountMl - ml < waterTargetMl) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
   };
 
   const submitCustomWater = () => {
@@ -137,6 +159,26 @@ export function ProfileScreen({ navigation }) {
     return acc;
   }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }), [logs]);
 
+  useEffect(() => {
+    if (!isToday || !hasTargets) return;
+    const dateStr = localDateString(selectedDate);
+    if (totals.calories >= profile.target_calories && caloriesCelebratedForRef.current !== dateStr) {
+      caloriesCelebratedForRef.current = dateStr;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      caloriesPulse.value = withSequence(withTiming(1.06, { duration: 180 }), withTiming(1, { duration: 220 }));
+    }
+  }, [totals.calories, isToday, hasTargets, profile?.target_calories, selectedDate]);
+
+  useEffect(() => {
+    if (!isToday) return;
+    const dateStr = localDateString(selectedDate);
+    if (waterMl > 0 && waterMl >= waterTargetMl && waterCelebratedForRef.current !== dateStr) {
+      waterCelebratedForRef.current = dateStr;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      waterPulse.value = withSequence(withTiming(1.06, { duration: 180 }), withTiming(1, { duration: 220 }));
+    }
+  }, [waterMl, isToday, waterTargetMl, selectedDate]);
+
   const goPrevDay = () => { Haptics.selectionAsync(); setSelectedDate((d) => addDays(d, -1)); };
   const goNextDay = () => { if (isToday) return; Haptics.selectionAsync(); setSelectedDate((d) => addDays(d, 1)); };
 
@@ -157,6 +199,12 @@ export function ProfileScreen({ navigation }) {
           </View>
           <Text style={common.h1}>Today's progress</Text>
           <Text style={common.tagline}>What you've logged against your daily targets.</Text>
+          {streak > 0 && (
+            <View style={dateNavStyles.streakPill}>
+              <MaterialCommunityIcons name="fire" size={14} color={colors.premium} />
+              <Text style={dateNavStyles.streakPillText}>{streak}-day streak</Text>
+            </View>
+          )}
         </View>
 
         <View style={dateNavStyles.pill}>
@@ -178,7 +226,9 @@ export function ProfileScreen({ navigation }) {
         {hasTargets && (
           <>
             <View style={[common.card, { alignItems: 'center', paddingVertical: 24 }]}>
-              <MacroRing value={totals.calories} target={profile.target_calories} />
+              <Animated.View style={caloriesPulseStyle}>
+                <MacroRing value={totals.calories} target={profile.target_calories} />
+              </Animated.View>
             </View>
 
             <View style={[common.card, { marginTop: 14 }]}>
@@ -214,7 +264,7 @@ export function ProfileScreen({ navigation }) {
             <ActivityIndicator style={{ marginTop: 14 }} color={colors.water} />
           ) : (
             <>
-              <View style={{ marginTop: 4 }}>
+              <Animated.View style={[{ marginTop: 4 }, waterPulseStyle]}>
                 <NutrientProgressBar
                   label="Today"
                   consumed={mlToDisplay(waterMl, unitSystem)}
@@ -222,7 +272,7 @@ export function ProfileScreen({ navigation }) {
                   unit={unitSystem === 'imperial' ? ' fl oz' : 'ml'}
                   color={colors.water}
                 />
-              </View>
+              </Animated.View>
 
               {isToday && (
                 <View style={{ marginTop: 4 }}>
@@ -354,4 +404,9 @@ function makeDateNavStyles(colors) { return StyleSheet.create({
     width: 48, height: 48, borderRadius: 14, borderCurve: 'continuous',
     backgroundColor: colors.water, alignItems: 'center', justifyContent: 'center',
   },
+  streakPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
+    backgroundColor: `${colors.premium}1A`, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 11, marginTop: 10,
+  },
+  streakPillText: { fontFamily: FONTS.bodyBold, fontSize: 12, color: colors.premium },
 }); }

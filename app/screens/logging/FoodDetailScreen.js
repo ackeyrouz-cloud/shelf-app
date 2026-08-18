@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { FONTS } from '../../theme/fonts';
 import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -82,6 +83,7 @@ export function FoodDetailScreen({ navigation, route }) {
       setError("Couldn't log this meal. Try again.");
       return;
     }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     navigation.popToTop();
   };
 

@@ -1,13 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue, useAnimatedStyle, withTiming, Easing, LinearTransition, FadeIn, FadeOut,
+} from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { FONTS } from '../theme/fonts';
 import { useTheme, useCommonStyles } from '../context/ThemeContext';
 import { MacroRing } from './MacroRing';
 import { MacroBar } from './MacroBar';
 import { LogMealButton } from './LogMealButton';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+// Shared by every recipe card, not recreated per instance — a fresh builder
+// per card would still animate correctly, but wastes allocations across a
+// list of 5 cards for identical timing.
+const CARD_LAYOUT_TRANSITION = LinearTransition.duration(260).easing(Easing.out(Easing.cubic));
 
 export function RecipeCard({ recipe, servings, open, onToggle }) {
   const { colors } = useTheme();
@@ -36,7 +44,11 @@ export function RecipeCard({ recipe, servings, open, onToggle }) {
   const fillStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: fill.value }] }));
 
   return (
-    <Pressable onPress={handleToggle} style={({ pressed }) => [styles.recipe, { borderLeftColor: matchColor }, pressed && { opacity: 0.92 }]}>
+    <AnimatedPressable
+      layout={CARD_LAYOUT_TRANSITION}
+      onPress={handleToggle}
+      style={({ pressed }) => [styles.recipe, { borderLeftColor: matchColor }, pressed && { opacity: 0.92 }]}
+    >
       <View style={styles.recipeTop}>
         <View style={{ flex: 1 }}>
           <Text style={styles.recipeTitle}>{recipe.title}</Text>
@@ -113,7 +125,7 @@ export function RecipeCard({ recipe, servings, open, onToggle }) {
       </View>
 
       {open && (
-        <View style={styles.recipeDetail}>
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(120)} style={styles.recipeDetail}>
           {recipe.calories != null && (
             <View style={styles.fullMacros}>
               <View style={{ alignItems: 'center', marginBottom: 16 }}>
@@ -160,9 +172,9 @@ export function RecipeCard({ recipe, servings, open, onToggle }) {
               <Text style={styles.stepText}>{s}</Text>
             </View>
           ))}
-        </View>
+        </Animated.View>
       )}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 

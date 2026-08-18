@@ -4,6 +4,7 @@ import {
   ActivityIndicator, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 import { FilterBlock } from '../../components/FilterBlock';
 import { ChipRow } from '../../components/ChipRow';
@@ -126,6 +127,7 @@ export function LogMealScreen({ navigation, route }) {
       setError("Couldn't save this entry. Check your connection and try again.");
       return;
     }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     navigation.popToTop();
   };
 
