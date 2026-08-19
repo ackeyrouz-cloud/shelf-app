@@ -815,10 +815,100 @@ If the photo does show food, but it's too blurry, dark, obscured, or far away to
   }
 });
 
+// POST /consolidate-shopping-list  { recipes: [{title, ingredients}], pantry }
+// Merges every planned recipe's full ingredient list for the week into one
+// shopping list, cross-referenced against the CURRENT pantry — not each
+// recipe's own stale idea of what's missing from whenever it was originally
+// generated, since the pantry may have changed since. This is a 5th
+// Claude-calling endpoint, so it gets the identical requireAuth +
+// costLimiter treatment as the other four.
+const MAX_PLAN_RECIPES = 25;
+const MAX_INGREDIENTS_PER_RECIPE = 40;
+
+app.post('/consolidate-shopping-list', requireAuth, costLimiter(10), async (req, res) => {
+  try {
+    const { recipes, pantry } = req.body;
+    if (!Array.isArray(recipes) || recipes.length === 0) {
+      return res.status(400).json({ error: 'Recipe list is required' });
+    }
+    if (recipes.length > MAX_PLAN_RECIPES) {
+      return res.status(400).json({ error: `Too many recipes (max ${MAX_PLAN_RECIPES}).` });
+    }
+    for (const r of recipes) {
+      if (!r || typeof r.title !== 'string' || r.title.length > MAX_ITEM_LENGTH) {
+        return res.status(400).json({ error: 'One or more recipe titles is invalid or too long.' });
+      }
+      if (!Array.isArray(r.ingredients) || r.ingredients.length > MAX_INGREDIENTS_PER_RECIPE
+        || r.ingredients.some((i) => typeof i !== 'string' || i.length > MAX_ITEM_LENGTH)) {
+        return res.status(400).json({ error: 'One or more ingredient lists is invalid or too long.' });
+      }
+    }
+    const pantryList = Array.isArray(pantry) ? pantry : [];
+    if (pantryList.length > MAX_PANTRY_ITEMS || pantryList.some((p) => typeof p !== 'string' || p.length > MAX_ITEM_LENGTH)) {
+      return res.status(400).json({ error: 'Pantry list is invalid or too long.' });
+    }
+
+    const recipeLines = recipes.map((r) => `- ${r.title}: ${r.ingredients.join('; ')}`).join('\n');
+    const prompt = `You are consolidating a shopping list from ${recipes.length} planned recipe(s) for the week.
+
+Recipes and their full ingredient lists:
+${recipeLines}
+
+The user's current pantry already has: ${pantryList.length ? pantryList.join(', ') : '(nothing)'}.
+
+Merge all ingredients across every recipe into a single consolidated shopping list:
+1. Combine matching ingredients across recipes into one line with a summed quantity (e.g. "1 onion" from one recipe plus "2 onions" from another becomes "3 onions") — never separate lines for the same ingredient.
+2. Skip anything already covered by the pantry list above — cross-reference against that list, not any recipe's own assumptions about what's on hand.
+3. Skip basic staples that are always assumed available (salt, pepper, cooking oil, water) unless a recipe calls for an unusual or specific amount worth buying more of.
+4. Keep a quantity and unit in each merged line (e.g. "3 onions", "2 cups jasmine rice", "1 lb chicken thighs") — round and combine sensibly rather than concatenating each recipe's own phrasing.
+
+Respond ONLY with compact JSON, no other text, in this exact shape:
+{"items":[{"name":"3 onions","fromRecipes":["Chicken Stir Fry","Beef Fajitas"]}]}
+
+"name" is the full display line (quantity + ingredient). "fromRecipes" lists which of the recipe titles above contributed to that line.`;
+
+    const data = await callClaude([{ role: 'user', content: prompt }], 3000);
+    const textBlock = (data.content || []).find((b) => b.type === 'text');
+    if (!textBlock) {
+      console.error('/consolidate-shopping-list: no text block in response. stop_reason:', data.stop_reason);
+      return res.status(502).json({ error: 'Could not generate a shopping list' });
+    }
+
+    let parsed;
+    try {
+      parsed = extractJson(textBlock.text);
+    } catch (parseErr) {
+      console.warn('/consolidate-shopping-list: model response was not valid JSON. Raw response:', String(textBlock.text).slice(0, 500));
+      return res.status(502).json({ error: 'Could not generate a shopping list' });
+    }
+
+    const items = Array.isArray(parsed.items)
+      ? parsed.items
+        .filter((i) => i && typeof i.name === 'string' && i.name.trim())
+        .map((i) => ({
+          name: i.name.trim(),
+          fromRecipes: Array.isArray(i.fromRecipes) ? i.fromRecipes.filter((r) => typeof r === 'string') : [],
+        }))
+      : [];
+
+    res.json({ items });
+  } catch (err) {
+    console.error(err);
+    if (err.name === 'TimeoutError') {
+      return res.status(504).json({ error: 'Request timed out', timeout: true });
+    }
+    if (err.status === 529 || err.status === 503) {
+      return res.status(503).json({ error: 'Service overloaded', overloaded: true });
+    }
+    res.status(500).json({ error: 'Failed to generate shopping list' });
+  }
+});
+
 // POST /delete-account  Authorization: Bearer <supabase access token>
-// Deleting the auth.users row cascades to profiles, pantry_items, and
-// meal_logs automatically — all three have `on delete cascade` foreign keys
-// to auth.users(id), so nothing else needs deleting explicitly here.
+// Deleting the auth.users row cascades automatically to every table with an
+// `on delete cascade` foreign key to auth.users(id) — profiles,
+// pantry_items, meal_logs, custom_foods, water_logs, meal_plans, and
+// shopping_list_items — so nothing else needs deleting explicitly here.
 app.post('/delete-account', requireAuth, async (req, res) => {
   try {
     if (!supabaseAdmin) {

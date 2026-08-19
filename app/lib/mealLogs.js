@@ -10,6 +10,17 @@ export function localDateString(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
+// The inverse of localDateString, for the rare case a date has to cross a
+// navigation boundary as a string param and come back. Never use
+// `new Date(dateStr)` for this — the JS Date constructor parses a bare
+// "YYYY-MM-DD" string as UTC midnight, which reads back as the *previous*
+// local calendar day in any negative-UTC timezone. This builds the Date
+// from local components directly instead.
+export function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 // macros = { calories, proteinG, carbsG, fatG, fiberG } — for recipe logs,
 // the exact per-serving values already shown on the recipe, never
 // re-estimated here. For manual entries, the values the user typed for

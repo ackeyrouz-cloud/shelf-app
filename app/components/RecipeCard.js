@@ -23,7 +23,29 @@ const CARD_LAYOUT_TRANSITION = LinearTransition.duration(260).easing(Easing.out(
 // celebration on every card.
 const READY_BADGE_ENTRANCE = ZoomIn.delay(450).duration(280).springify().damping(12);
 
-export function RecipeCard({ recipe, servings, open, onToggle }) {
+// onAssign switches the card into meal-planning picker mode: the log button
+// is replaced with a single-tap "Assign to plan" action (no inline
+// servings-adjust panel the way logging has — a plan doesn't need "servings
+// eaten" yet, it's assigned at the search's own serving count and adjustable
+// later). Only one action button is ever shown, never both.
+function AssignButton({ recipe, onAssign, colors, styles }) {
+  const canAssign = recipe.calories != null && recipe.proteinG != null && recipe.carbsG != null && recipe.fatG != null;
+  if (!canAssign) return null;
+  const handlePress = () => {
+    Haptics.selectionAsync();
+    onAssign(recipe);
+  };
+  return (
+    <View style={styles.wrap}>
+      <Pressable onPress={handlePress} style={styles.button}>
+        <Feather name="calendar" size={16} color={colors.onFill} />
+        <Text style={styles.buttonText}>Assign to plan</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+export function RecipeCard({ recipe, servings, open, onToggle, onAssign }) {
   const { colors } = useTheme();
   const common = useCommonStyles();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -126,7 +148,9 @@ export function RecipeCard({ recipe, servings, open, onToggle }) {
         </View>
       )}
 
-      {!open && <LogMealButton recipe={recipe} />}
+      {!open && (onAssign
+        ? <AssignButton recipe={recipe} onAssign={onAssign} colors={colors} styles={styles} />
+        : <LogMealButton recipe={recipe} />)}
 
       <View style={styles.expandRow}>
         <Text style={common.expandHint}>{open ? 'Tap to collapse' : 'Tap for full recipe'}</Text>
@@ -153,7 +177,9 @@ export function RecipeCard({ recipe, servings, open, onToggle }) {
                   <Text style={styles.fiberStatValue}>{Math.round(recipe.fiberG)}g</Text>
                 </View>
               )}
-              <LogMealButton recipe={recipe} />
+              {onAssign
+                ? <AssignButton recipe={recipe} onAssign={onAssign} colors={colors} styles={styles} />
+                : <LogMealButton recipe={recipe} />}
             </View>
           )}
 
@@ -188,6 +214,13 @@ export function RecipeCard({ recipe, servings, open, onToggle }) {
 }
 
 function makeStyles(colors) { return StyleSheet.create({
+  wrap: { marginTop: 12 },
+  button: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+    backgroundColor: colors.primary, borderRadius: 999, borderCurve: 'continuous', minHeight: 44, paddingHorizontal: 16,
+  },
+  buttonText: { fontFamily: FONTS.bodyBold, fontSize: 14, color: colors.onFill },
+
   recipe: {
     backgroundColor: colors.surface, borderLeftWidth: 4, borderRadius: 20, borderCurve: 'continuous',
     padding: 16, marginBottom: 14, boxShadow: '0 6px 16px rgba(0,0,0,0.3)',

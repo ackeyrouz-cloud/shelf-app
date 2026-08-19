@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  SafeAreaView, ScrollView, View, Text, TextInput,
+  SafeAreaView, ScrollView, View, Text, TextInput, Pressable,
   ActivityIndicator, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import Animated, { FadeInUp } from 'react-native-reanimated';
+import { Feather } from '@expo/vector-icons';
+import { FONTS } from '../../theme/fonts';
 import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 import { FilterBlock } from '../../components/FilterBlock';
 import { ChipRow, MultiChipRow } from '../../components/ChipRow';
@@ -14,7 +16,11 @@ import { getAuthHeaders } from '../../lib/supabase';
 import { DIETS, DIET_CONFLICTS, TIMES, SERVINGS, dietLabel } from '../../lib/diets';
 import { API_BASE_URL, REQUEST_TIMEOUT_MS, TIMEOUT_MESSAGE, OVERLOADED_MESSAGE } from '../../lib/config';
 
-export function RecipesScreen() {
+// onAssign, when provided, switches every RecipeCard into meal-planning
+// picker mode (see RecipeCard.js) — the search/filter/results UI itself is
+// otherwise unchanged. Used both as the plain Recipes tab (no onAssign) and
+// reused directly inside AssignMealScreen's "Generate recipes" path.
+export function RecipesScreen({ navigation, onAssign }) {
   const { pantry } = usePantry();
   const { colors } = useTheme();
   const common = useCommonStyles();
@@ -122,16 +128,41 @@ export function RecipesScreen() {
     }
   };
 
-  return (
-    <SafeAreaView style={common.safe}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={common.wrap} keyboardShouldPersistTaps="handled">
+  // In picker mode (onAssign set), this returns just the scrollable content
+  // — AssignMealScreen owns the SafeAreaView/KeyboardAvoidingView/header at
+  // that point, so wrapping again here would nest both. The plain Recipes
+  // tab usage (no onAssign) is completely unchanged below.
+  const content = (
+    <ScrollView contentContainerStyle={common.wrap} keyboardShouldPersistTaps="handled">
 
-          <View style={common.header}>
-            <Text style={common.eyebrow}>RECIPES</Text>
-            <Text style={common.h1}>Find something to cook</Text>
-            <Text style={common.tagline}>Set your filters, then find recipes ranked by how little extra shopping they need.</Text>
-          </View>
+          {!onAssign && (
+            <>
+              <View style={common.header}>
+                <Text style={common.eyebrow}>RECIPES</Text>
+                <Text style={common.h1}>Find something to cook</Text>
+                <Text style={common.tagline}>Set your filters, then find recipes ranked by how little extra shopping they need.</Text>
+              </View>
+              <Pressable
+                onPress={() => navigation.navigate('WeekPlan')}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 10,
+                  backgroundColor: `${colors.success}18`, borderRadius: 16, borderCurve: 'continuous',
+                  padding: 14, marginBottom: 20,
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Plan my week"
+              >
+                <Feather name="calendar" size={18} color={colors.success} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontFamily: FONTS.bodyBold, fontSize: 14, color: colors.ink }}>Plan my week</Text>
+                  <Text style={{ fontFamily: FONTS.bodyRegular, fontSize: 12, color: colors.inkMuted, marginTop: 1 }}>
+                    Assign recipes to days and build a shopping list
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.inkMuted} />
+              </Pressable>
+            </>
+          )}
 
           <View style={common.card}>
             <FilterBlock title="Diet">
@@ -175,11 +206,20 @@ export function RecipesScreen() {
                   servings={recipeServings}
                   open={openIndex === i}
                   onToggle={() => setOpenIndex(openIndex === i ? null : i)}
+                  onAssign={onAssign}
                 />
               </Animated.View>
             ))}
           </View>
-        </ScrollView>
+    </ScrollView>
+  );
+
+  if (onAssign) return content;
+
+  return (
+    <SafeAreaView style={common.safe}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        {content}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
