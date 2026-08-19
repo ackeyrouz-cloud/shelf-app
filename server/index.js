@@ -7,11 +7,25 @@
 
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Outer layer, applied to every route regardless of auth: caps raw request
+// volume per IP so flooding /find-recipes with garbage (or hammering
+// /delete-account's auth check itself) can't run unbounded before a token
+// is ever checked. Generous on purpose — this is a flood backstop, not the
+// main defense; the per-user limiters below do the real cost control.
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests from this connection. Try again in a few minutes.', rateLimited: true },
+}));
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-5';
@@ -43,6 +57,42 @@ const supabaseAdmin = SUPABASE_SERVICE_ROLE_KEY
 
 if (!SUPABASE_SERVICE_ROLE_KEY) {
   console.warn('WARNING: SUPABASE_SERVICE_ROLE_KEY is not set. /delete-account will fail.');
+}
+
+// Verifies the caller holds a real, current Supabase session before letting
+// them reach an endpoint that costs real money (Anthropic tokens) or touches
+// account data — never trust a client-supplied user id, only what this
+// token resolves to server-side. Same check /delete-account always did;
+// pulled out here so every cost-sensitive route uses the identical path
+// rather than a copy that could quietly drift.
+async function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Missing access token' });
+
+  const { data: { user }, error } = await supabaseAuth.auth.getUser(token);
+  if (error || !user) return res.status(401).json({ error: 'Invalid or expired session' });
+
+  req.userId = user.id;
+  next();
+}
+
+// Per-user cost control for the endpoints that call Anthropic — this is the
+// layer that actually matters, since requireAuth runs first and sets
+// req.userId, so abuse can't be dodged just by rotating IPs the way it could
+// with the flood limiter above. req.ip is only a fallback for the
+// unreachable case where this runs without req.userId set.
+// windowMs/max are tuned per endpoint below by relative cost, not identical
+// across all four.
+function costLimiter(max, windowMs = 15 * 60 * 1000) {
+  return rateLimit({
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.userId || req.ip,
+    message: { error: 'Too many requests — please slow down and try again in a few minutes.', rateLimited: true },
+  });
 }
 // Node/undici's default fetch timeout is 5 minutes with no feedback to the user in that
 // window — cap it far below that so a stalled request fails fast with a clear message
@@ -183,8 +233,18 @@ function parseTimeToMinutes(str) {
   return minutes > 0 ? minutes : null;
 }
 
+// Freeform-text caps for fields that get interpolated into a Claude prompt —
+// generous enough that no real pantry, description, or caption ever hits
+// them, but bounded so a scripted caller can't inflate a request (and the
+// bill for it) by sending something absurd. Rejected outright rather than
+// silently truncated, so the caller gets a clear reason instead of a
+// silently-wrong result.
+const MAX_PANTRY_ITEMS = 150;
+const MAX_ITEM_LENGTH = 200;
+const MAX_TEXT_LENGTH = 500;
+
 // POST /identify-ingredients  { base64, mediaType }
-app.post('/identify-ingredients', async (req, res) => {
+app.post('/identify-ingredients', requireAuth, costLimiter(30), async (req, res) => {
   try {
     const { base64, mediaType } = req.body;
     if (!base64) return res.status(400).json({ error: 'Missing image data' });
@@ -231,11 +291,20 @@ If the photo doesn't show food or pantry items at all, respond with:
 });
 
 // POST /find-recipes  { pantry: [], diets: [], time, mood, servings }
-app.post('/find-recipes', async (req, res) => {
+app.post('/find-recipes', requireAuth, costLimiter(10), async (req, res) => {
   try {
     const { pantry, diets, time, mood, servings } = req.body;
     if (!Array.isArray(pantry) || pantry.length === 0) {
       return res.status(400).json({ error: 'Pantry list is required' });
+    }
+    if (pantry.length > MAX_PANTRY_ITEMS) {
+      return res.status(400).json({ error: `Pantry list is too long (max ${MAX_PANTRY_ITEMS} items).` });
+    }
+    if (pantry.some((p) => typeof p !== 'string' || p.length > MAX_ITEM_LENGTH)) {
+      return res.status(400).json({ error: 'One or more pantry items is invalid or too long.' });
+    }
+    if (mood && String(mood).length > MAX_TEXT_LENGTH) {
+      return res.status(400).json({ error: 'Mood/style text is too long.' });
     }
 
     const dietList = (Array.isArray(diets) ? diets : []).filter(d => d && d !== 'none');
@@ -540,11 +609,14 @@ app.get('/food-search', async (req, res) => {
 // again — this endpoint has no memory of its own across calls, the client
 // is responsible for combining the original description with the
 // clarification into one string before resubmitting.
-app.post('/estimate-meal', async (req, res) => {
+app.post('/estimate-meal', requireAuth, costLimiter(20), async (req, res) => {
   try {
     const { description, mustEstimate } = req.body;
     if (!description || !String(description).trim()) {
       return res.status(400).json({ error: 'Missing description' });
+    }
+    if (String(description).length > MAX_TEXT_LENGTH) {
+      return res.status(400).json({ error: 'Description is too long.' });
     }
 
     const clarificationInstruction = mustEstimate
@@ -643,10 +715,13 @@ If (and only if) you genuinely cannot estimate at all:
 // about a photo). Genuinely unreadable photos fail outright with a message
 // pointing at "Describe a meal" as the fallback, rather than guessing wildly
 // or inventing a photo-specific mini-chat.
-app.post('/estimate-meal-photo', async (req, res) => {
+app.post('/estimate-meal-photo', requireAuth, costLimiter(20), async (req, res) => {
   try {
     const { base64, mediaType, caption } = req.body;
     if (!base64) return res.status(400).json({ error: 'Missing image data' });
+    if (caption && String(caption).length > MAX_TEXT_LENGTH) {
+      return res.status(400).json({ error: 'Caption is too long.' });
+    }
 
     const captionText = caption && String(caption).trim()
       ? `\nThe user also added this note: "${String(caption).trim()}"`
@@ -744,21 +819,14 @@ If the photo does show food, but it's too blurry, dark, obscured, or far away to
 // Deleting the auth.users row cascades to profiles, pantry_items, and
 // meal_logs automatically — all three have `on delete cascade` foreign keys
 // to auth.users(id), so nothing else needs deleting explicitly here.
-app.post('/delete-account', async (req, res) => {
+app.post('/delete-account', requireAuth, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'Missing access token' });
-
-    const { data: { user }, error: userErr } = await supabaseAuth.auth.getUser(token);
-    if (userErr || !user) return res.status(401).json({ error: 'Invalid or expired session' });
-
     if (!supabaseAdmin) {
       console.error('/delete-account: SUPABASE_SERVICE_ROLE_KEY is not configured');
       return res.status(500).json({ error: 'Account deletion is not configured on the server' });
     }
 
-    const { error: deleteErr } = await supabaseAdmin.auth.admin.deleteUser(user.id);
+    const { error: deleteErr } = await supabaseAdmin.auth.admin.deleteUser(req.userId);
     if (deleteErr) {
       console.error('/delete-account: deleteUser failed', deleteErr);
       return res.status(500).json({ error: 'Failed to delete account' });

@@ -10,6 +10,7 @@ import { ChipRow, MultiChipRow } from '../../components/ChipRow';
 import { RecipeCard } from '../../components/RecipeCard';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { usePantry } from '../../context/PantryContext';
+import { getAuthHeaders } from '../../lib/supabase';
 import { DIETS, DIET_CONFLICTS, TIMES, SERVINGS, dietLabel } from '../../lib/diets';
 import { API_BASE_URL, REQUEST_TIMEOUT_MS, TIMEOUT_MESSAGE, OVERLOADED_MESSAGE } from '../../lib/config';
 
@@ -79,9 +80,10 @@ export function RecipesScreen() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch(`${API_BASE_URL}/find-recipes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ pantry: pantry.map(p => p.name), diets, time, mood, servings }),
         signal: controller.signal,
       });

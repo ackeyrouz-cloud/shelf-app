@@ -14,3 +14,15 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     detectSessionInUrl: false,
   },
 });
+
+// Backend endpoints that call Anthropic (identify-ingredients, find-recipes,
+// estimate-meal, estimate-meal-photo) require this Bearer token — same
+// pattern deleteAccount() already used, pulled out here so every caller uses
+// the identical path. Throws rather than returning empty headers on a
+// missing session so a stale/expired session fails with a clear message
+// instead of silently hitting the backend's 401.
+export async function getAuthHeaders() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not signed in.');
+  return { Authorization: `Bearer ${session.access_token}` };
+}

@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
-import { supabase } from '../lib/supabase';
+import { supabase, getAuthHeaders } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { dedupeNewItems } from '../lib/dedupe';
 import { API_BASE_URL, REQUEST_TIMEOUT_MS, TIMEOUT_MESSAGE, OVERLOADED_MESSAGE } from '../lib/config';
@@ -121,11 +121,12 @@ export function PantryProvider({ children }) {
       const asset = result.assets[0];
 
       setPhotoLoading(true);
+      const authHeaders = await getAuthHeaders();
       const controller = new AbortController();
       timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
       const res = await fetch(`${API_BASE_URL}/identify-ingredients`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ base64: asset.base64, mediaType: 'image/jpeg' }),
         signal: controller.signal,
       });

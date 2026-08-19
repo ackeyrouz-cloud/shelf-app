@@ -1,4 +1,5 @@
 import { API_BASE_URL, REQUEST_TIMEOUT_MS } from './config';
+import { getAuthHeaders } from './supabase';
 
 // A single Claude-estimated nutrition pass — see server/index.js's
 // /estimate-meal for the "at most one clarifying question, ever" contract.
@@ -8,9 +9,10 @@ export async function estimateMeal(description, { mustEstimate = false } = {}) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60000);
   try {
+    const authHeaders = await getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/estimate-meal`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ description, mustEstimate }),
       signal: controller.signal,
     });
@@ -55,9 +57,10 @@ export async function estimateMealPhoto(base64, mediaType, caption) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
+    const authHeaders = await getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/estimate-meal-photo`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
       body: JSON.stringify({ base64, mediaType, caption }),
       signal: controller.signal,
     });
