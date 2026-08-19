@@ -20,7 +20,8 @@ export const UNITS = {
 
 export const STANDARD_UNIT_ORDER = ['g', 'oz', 'lb', 'kg', 'ml', 'l', 'flOz', 'cup'];
 
-export function defaultUnitFor(isBeverage) {
+export function defaultUnitFor(isBeverage, unitSystem = 'metric') {
+  if (unitSystem === 'imperial') return isBeverage ? 'flOz' : 'oz';
   return isBeverage ? 'ml' : 'g';
 }
 

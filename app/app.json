@@ -40,7 +40,8 @@
     "plugins": [
       "expo-asset",
       "expo-font",
-      "expo-camera"
+      "expo-camera",
+      "expo-notifications"
     ]
   }
 }

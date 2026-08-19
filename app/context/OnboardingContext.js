@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { calculateTargets } from '../lib/targets';
-import { getWaterUnitSystem, mlToDisplay, displayToMl, displayUnitLabel } from '../lib/water';
+import { mlToDisplay, displayToMl, displayUnitLabel } from '../lib/water';
 import { useAuth } from './AuthContext';
 import { useProfile } from './ProfileContext';
 
@@ -20,6 +20,12 @@ export function OnboardingProvider({ children }) {
   // True whenever there's a complete existing profile to edit (i.e. this
   // mount came from Settings' "Recalculate Targets", not first-time signup).
   const isEditingExisting = profile?.weight != null;
+
+  // Display-only — weight/height are still always stored in kg/cm (see
+  // lib/measurements.js). Defaults to metric during first-time onboarding,
+  // before a profile row (and therefore a saved preference) exists; the
+  // setting itself only lives in Settings, not as an onboarding question.
+  const unitSystem = profile?.unit_system ?? 'metric';
 
   // Wheel-picker fields get sane defaults so the highlighted value and the
   // Continue button always agree — there's no "nothing selected" state for
@@ -45,9 +51,8 @@ export function OnboardingProvider({ children }) {
   // shown during first-time onboarding — but it's still part of every save,
   // seeded here so a first-time save writes a sensible default rather than
   // needing a special case.
-  const waterUnitSystem = useMemo(() => getWaterUnitSystem(), []);
-  const waterUnitLabel = displayUnitLabel(waterUnitSystem);
-  const [waterInput, setWaterInput] = useState(() => String(Math.round(mlToDisplay(profile?.target_water_ml ?? 2000, waterUnitSystem))));
+  const waterUnitLabel = displayUnitLabel(unitSystem);
+  const [waterInput, setWaterInput] = useState(() => String(Math.round(mlToDisplay(profile?.target_water_ml ?? 2000, unitSystem))));
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -82,7 +87,7 @@ export function OnboardingProvider({ children }) {
       setSaveError('Enter valid numbers for all targets.');
       return false;
     }
-    const finalWaterMl = displayToMl(parseFloat(waterInput), waterUnitSystem);
+    const finalWaterMl = displayToMl(parseFloat(waterInput), unitSystem);
     if (!(finalWaterMl > 0)) {
       setSaveError('Enter a valid water goal.');
       return false;
@@ -122,6 +127,7 @@ export function OnboardingProvider({ children }) {
 
   const value = {
     isEditingExisting,
+    unitSystem,
     sex, setSex,
     age, setAge,
     height, setHeight,

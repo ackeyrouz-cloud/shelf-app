@@ -12,7 +12,7 @@ import { MealLogEntry } from '../../components/MealLogEntry';
 import { useProfile } from '../../context/ProfileContext';
 import { getMealLogsForDate, localDateString } from '../../lib/mealLogs';
 import {
-  getWaterUnitSystem, quickAddAmounts, mlToDisplay, displayToMl, displayUnitLabel,
+  quickAddAmounts, mlToDisplay, displayToMl, displayUnitLabel,
   getWaterForDate, addWater, resetWaterForDate,
 } from '../../lib/water';
 import { getLoggingStreak } from '../../lib/streak';
@@ -63,7 +63,7 @@ export function ProfileScreen({ navigation }) {
 
   const hasTargets = profile?.target_calories != null;
   const isToday = localDateString(selectedDate) === localDateString(new Date());
-  const unitSystem = useMemo(() => getWaterUnitSystem(), []);
+  const unitSystem = profile?.unit_system ?? 'metric';
   const waterQuickAdds = useMemo(() => quickAddAmounts(unitSystem), [unitSystem]);
   const waterTargetMl = profile?.target_water_ml ?? 2000;
 

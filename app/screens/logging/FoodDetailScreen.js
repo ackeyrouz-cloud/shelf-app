@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { FONTS } from '../../theme/fonts';
 import { useTheme, useCommonStyles } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useProfile } from '../../context/ProfileContext';
 import { ChipRow } from '../../components/ChipRow';
 import { MacroBar } from '../../components/MacroBar';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -19,11 +20,12 @@ const UNIT_OPTIONS = STANDARD_UNIT_ORDER.map((v) => ({ v, label: UNITS[v].label 
 export function FoodDetailScreen({ navigation, route }) {
   const { food, defaultQuantity, defaultUnit } = route.params;
   const { userId } = useAuth();
+  const { profile } = useProfile();
   const { colors } = useTheme();
   const common = useCommonStyles();
 
   const [quantityText, setQuantityText] = useState(String(defaultQuantity ?? 100));
-  const [unit, setUnit] = useState(defaultUnit || defaultUnitFor(food.isBeverage));
+  const [unit, setUnit] = useState(defaultUnit || defaultUnitFor(food.isBeverage, profile?.unit_system));
   const [namedServing, setNamedServing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');

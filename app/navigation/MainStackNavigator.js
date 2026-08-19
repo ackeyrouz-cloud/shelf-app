@@ -5,6 +5,7 @@ import { OnboardingNavigator } from './OnboardingNavigator';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
 import { ChangePasswordScreen } from '../screens/settings/ChangePasswordScreen';
 import { DeleteAccountScreen } from '../screens/settings/DeleteAccountScreen';
+import { PrivacyInfoScreen } from '../screens/settings/PrivacyInfoScreen';
 import { LogMealMethodScreen } from '../screens/logging/LogMealMethodScreen';
 import { LogMealScreen } from '../screens/logging/LogMealScreen';
 import { FoodSearchScreen } from '../screens/logging/FoodSearchScreen';
@@ -12,6 +13,9 @@ import { FoodDetailScreen } from '../screens/logging/FoodDetailScreen';
 import { BarcodeScannerScreen } from '../screens/logging/BarcodeScannerScreen';
 import { DescribeMealScreen } from '../screens/logging/DescribeMealScreen';
 import { PhotoMealScreen } from '../screens/logging/PhotoMealScreen';
+import { WeekPlanScreen } from '../screens/planning/WeekPlanScreen';
+import { AssignMealScreen } from '../screens/planning/AssignMealScreen';
+import { ShoppingListScreen } from '../screens/planning/ShoppingListScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -25,6 +29,7 @@ export function MainStackNavigator() {
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
+      <Stack.Screen name="PrivacyInfo" component={PrivacyInfoScreen} />
       <Stack.Screen
         name="EditTargets"
         component={OnboardingNavigator}
@@ -45,6 +50,14 @@ export function MainStackNavigator() {
       <Stack.Screen name="BarcodeScanner" component={BarcodeScannerScreen} />
       <Stack.Screen name="DescribeMeal" component={DescribeMealScreen} />
       <Stack.Screen name="PhotoMeal" component={PhotoMealScreen} />
+
+      <Stack.Screen name="WeekPlan" component={WeekPlanScreen} />
+      <Stack.Screen
+        name="AssignMeal"
+        component={AssignMealScreen}
+        options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen name="ShoppingList" component={ShoppingListScreen} />
     </Stack.Navigator>
   );
 }

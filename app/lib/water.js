@@ -2,22 +2,9 @@ import { supabase } from './supabase';
 import { UNITS } from './units';
 import { localDateString } from './mealLogs';
 
-// Storage is always ml — display unit is auto-detected once from the
-// device's region via the built-in Hermes Intl API (no new native
-// dependency). US region gets fl oz/cups; everywhere else gets ml/L. This
-// isn't tied to a manual toggle since the app doesn't have a general
-// unit-system setting yet — if one gets built later, this is the one place
-// that would need to start reading it instead.
-export function getWaterUnitSystem() {
-  try {
-    const locale = Intl.NumberFormat().resolvedOptions().locale; // e.g. "en-US"
-    const region = locale.split('-')[1];
-    return region === 'US' ? 'imperial' : 'metric';
-  } catch (e) {
-    return 'metric';
-  }
-}
-
+// Storage is always ml — display unit comes from profiles.unit_system (the
+// app-wide unit system setting in Settings), not a water-specific choice.
+//
 // Fluid ounces (UNITS.flOz), not the weight ounce (UNITS.oz) — water is a
 // volume, and those two "oz" units are meaningfully different conversions.
 export function quickAddAmounts(unitSystem) {

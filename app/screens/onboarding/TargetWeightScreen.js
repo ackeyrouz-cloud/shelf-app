@@ -3,10 +3,12 @@ import { QuestionScreenLayout } from '../../components/QuestionScreenLayout';
 import { NumberWheelPicker } from '../../components/NumberWheelPicker';
 import { useTheme } from '../../context/ThemeContext';
 import { useOnboarding } from '../../context/OnboardingContext';
+import { kgToLb, lbToKg } from '../../lib/measurements';
 
 export function TargetWeightScreen({ navigation }) {
-  const { targetWeight, setTargetWeight } = useOnboarding();
+  const { targetWeight, setTargetWeight, unitSystem } = useOnboarding();
   const { colors } = useTheme();
+  const isImperial = unitSystem === 'imperial';
 
   return (
     <QuestionScreenLayout
@@ -20,13 +22,13 @@ export function TargetWeightScreen({ navigation }) {
       onContinue={() => navigation.navigate('Timeframe')}
     >
       <NumberWheelPicker
-        value={targetWeight}
-        onChange={setTargetWeight}
-        min={30}
-        max={250}
-        step={0.5}
-        unit="kg"
-        formatValue={(v) => v.toFixed(1)}
+        value={isImperial ? kgToLb(targetWeight) : targetWeight}
+        onChange={(v) => setTargetWeight(isImperial ? lbToKg(v) : v)}
+        min={isImperial ? 66 : 30}
+        max={isImperial ? 550 : 250}
+        step={isImperial ? 1 : 0.5}
+        unit={isImperial ? 'lb' : 'kg'}
+        formatValue={(v) => (isImperial ? String(Math.round(v)) : v.toFixed(1))}
         accentColor={colors.premium}
       />
     </QuestionScreenLayout>
